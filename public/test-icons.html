@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Icon Test - Categories</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .category-card {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: white;
+        }
+        .category-icon {
+            width: 48px;
+            height: 48px;
+            margin-right: 12px;
+            border-radius: 4px;
+        }
+        .category-name {
+            font-weight: 500;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+        .error {
+            background: #ffebee;
+            border-left-color: #f44336;
+            color: #c62828;
+        }
+        .success {
+            background: #e8f5e8;
+            border-left-color: #4caf50;
+            color: #2e7d32;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Category Icons Test</h1>
+        <p>Testing if category icons load correctly from the backend API.</p>
+        
+        <div id="status" class="status">Loading...</div>
+        
+        <div id="categories" class="category-grid">
+            <!-- Categories will be loaded here -->
+        </div>
+    </div>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        const categoriesEl = document.getElementById('categories');
+
+        async function testCategories() {
+            try {
+                statusEl.textContent = 'Fetching categories from API...';
+                
+                const response = await fetch('http://localhost:5001/api/categories');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.message || 'API returned error');
+                }
+                
+                statusEl.className = 'status success';
+                statusEl.textContent = `✅ Successfully loaded ${data.data.length} categories`;
+                
+                // Display categories
+                categoriesEl.innerHTML = data.data.map(category => {
+                    const iconUrl = category.iconUrl || `http://localhost:5001${category.icon}`;
+                    return `
+                        <div class="category-card">
+                            <img 
+                                class="category-icon" 
+                                src="${iconUrl}" 
+                                alt="${category.name}"
+                                onerror="this.style.background='#ffcdd2'; this.alt='❌ Failed to load'"
+                                onload="console.log('✅ Loaded:', '${category.name}')"
+                            />
+                            <div class="category-name">${category.name}</div>
+                        </div>
+                    `;
+                }).join('');
+                
+            } catch (error) {
+                statusEl.className = 'status error';
+                statusEl.textContent = `❌ Error: ${error.message}`;
+                console.error('Categories fetch error:', error);
+            }
+        }
+
+        // Test when page loads
+        testCategories();
+    </script>
+</body>
+</html>

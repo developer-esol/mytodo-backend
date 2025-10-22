@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyToDoo Notification Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .notification {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            animation: slideIn 0.3s ease-in;
+        }
+        .notification.high-priority {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .status.connected {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+        .status.disconnected {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+        #notifications-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .sound-controls {
+            margin: 20px 0;
+        }
+        .checkbox {
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔔 MyToDoo Notification System Test</h1>
+        
+        <div class="section">
+            <h3>Connection Status</h3>
+            <div id="connection-status" class="status disconnected">
+                Disconnected
+            </div>
+            <button onclick="connectToNotifications()">Connect to Notifications</button>
+        </div>
+
+        <div class="section">
+            <h3>Sound Settings</h3>
+            <div class="sound-controls">
+                <label class="checkbox">
+                    <input type="checkbox" id="soundEnabled" checked> Enable notification sounds
+                </label>
+                <br>
+                <button onclick="testSound()">Test Sound</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Test Notifications</h3>
+            <button onclick="sendTestNotification()">Send Test Notification</button>
+            <button onclick="sendHighPriorityNotification()">Send High Priority (with sound)</button>
+            <button onclick="sendOfferNotification()">Send Offer Notification (with sound)</button>
+            <button onclick="sendMessageNotification()">Send Message Notification (with sound)</button>
+        </div>
+
+        <div class="section">
+            <h3>Live Notifications</h3>
+            <div id="notifications-container">
+                <!-- Notifications will appear here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio elements for different notification sounds -->
+    <audio id="notification-sound" preload="auto">
+        <source src="data:audio/wav;base64,[REDACTED_AWS_SECRET_ACCESS_KEY][REDACTED_AWS_SECRET_ACCESS_KEY][REDACTED_AWS_SECRET_ACCESS_KEY][REDACTED_AWS_SECRET_ACCESS_KEY]66hVFApGn+H2u2QZBU+Vzfbheyc=" type="audio/wav">
+    </audio>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        let socket;
+        let userId = 'test-user-' + Math.random().toString(36).substr(2, 9); // Generate random test user ID
+        let soundEnabled = true;
+
+        // Initialize notification sound
+        const notificationSound = document.getElementById('notification-sound');
+
+        function connectToNotifications() {
+            // Connect to Socket.io server
+            socket = io('http://localhost:5001', {
+                transports: ['websocket', 'polling']
+            });
+
+            socket.on('connect', () => {
+                console.log('Connected to notification server');
+                updateConnectionStatus('Connected', 'connected');
+                
+                // Join user's notification room
+                socket.emit('join-user-room', userId);
+                
+                // Send sound preference
+                socket.emit('update-sound-preference', {
+                    userId: userId,
+                    soundEnabled: soundEnabled
+                });
+            });
+
+            socket.on('disconnect', () => {
+                console.log('Disconnected from notification server');
+                updateConnectionStatus('Disconnected', 'disconnected');
+            });
+
+            socket.on('room-joined', (data) => {
+                console.log('Joined notification room:', data);
+                showNotification({
+                    type: 'SYSTEM',
+                    title: 'Connected',
+                    message: data.message,
+                    priority: 'NORMAL',
+                    playSound: false
+                });
+            });
+
+            // Listen for incoming notifications
+            socket.on('notification', (notification) => {
+                console.log('Received notification:', notification);
+                showNotification(notification);
+                
+                // Play sound if enabled and notification requires it
+                if (soundEnabled && notification.playSound) {
+                    playNotificationSound();
+                }
+            });
+
+            socket.on('error', (error) => {
+                console.error('Socket error:', error);
+                showNotification({
+                    type: 'ERROR',
+                    title: 'Connection Error',
+                    message: error.message,
+                    priority: 'HIGH',
+                    playSound: false
+                });
+            });
+        }
+
+        function updateConnectionStatus(text, className) {
+            const statusElement = document.getElementById('connection-status');
+            statusElement.textContent = text;
+            statusElement.className = 'status ' + className;
+        }
+
+        function showNotification(notification) {
+            const container = document.getElementById('notifications-container');
+            const notificationElement = document.createElement('div');
+            
+            const priorityClass = notification.priority === 'HIGH' || notification.priority === 'URGENT' 
+                ? 'high-priority' : '';
+            
+            notificationElement.className = `notification ${priorityClass}`;
+            
+            const soundIndicator = notification.playSound ? '🔊 ' : '🔇 ';
+            
+            notificationElement.innerHTML = `
+                <strong>${soundIndicator}${notification.title}</strong>
+                <p>${notification.message}</p>
+                <small>
+                    Type: ${notification.type} | 
+                    Priority: ${notification.priority} | 
+                    ${new Date(notification.createdAt || Date.now()).toLocaleTimeString()}
+                </small>
+            `;
+            
+            container.insertBefore(notificationElement, container.firstChild);
+            
+            // Remove old notifications (keep only last 10)
+            while (container.children.length > 10) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        function playNotificationSound() {
+            try {
+                // Reset and play the sound
+                notificationSound.currentTime = 0;
+                notificationSound.play().catch(error => {
+                    console.log('Could not play sound:', error);
+                    // Fallback to browser beep if available
+                    if (window.navigator && window.navigator.vibrate) {
+                        window.navigator.vibrate(200);
+                    }
+                });
+            } catch (error) {
+                console.error('Sound play error:', error);
+            }
+        }
+
+        function testSound() {
+            if (soundEnabled) {
+                playNotificationSound();
+                showNotification({
+                    type: 'TEST',
+                    title: 'Sound Test',
+                    message: 'Testing notification sound',
+                    priority: 'NORMAL',
+                    playSound: true
+                });
+            } else {
+                showNotification({
+                    type: 'TEST',
+                    title: 'Sound Test',
+                    message: 'Sound is disabled',
+                    priority: 'NORMAL',
+                    playSound: false
+                });
+            }
+        }
+
+        function sendTestNotification() {
+            if (socket && socket.connected) {
+                socket.emit('test-notification', { userId: userId });
+            } else {
+                alert('Please connect to notifications first');
+            }
+        }
+
+        function sendHighPriorityNotification() {
+            // Simulate a high priority notification
+            const notification = {
+                id: 'test-' + Date.now(),
+                type: 'URGENT_UPDATE',
+                title: 'High Priority Alert',
+                message: 'This is an urgent notification that should play sound!',
+                priority: 'HIGH',
+                playSound: true,
+                createdAt: new Date()
+            };
+            
+            showNotification(notification);
+            if (soundEnabled) {
+                playNotificationSound();
+            }
+        }
+
+        function sendOfferNotification() {
+            const notification = {
+                id: 'offer-' + Date.now(),
+                type: 'OFFER_MADE',
+                title: 'New Offer Received',
+                message: 'Someone made an offer on your task "Clean Kitchen"',
+                priority: 'HIGH',
+                playSound: true,
+                metadata: {
+                    taskTitle: 'Clean Kitchen',
+                    offerAmount: 50,
+                    senderName: 'John Doe'
+                },
+                createdAt: new Date()
+            };
+            
+            showNotification(notification);
+            if (soundEnabled) {
+                playNotificationSound();
+            }
+        }
+
+        function sendMessageNotification() {
+            const notification = {
+                id: 'message-' + Date.now(),
+                type: 'MESSAGE_RECEIVED',
+                title: 'New Message',
+                message: 'You have a new message about "Clean Kitchen"',
+                priority: 'NORMAL',
+                playSound: true,
+                metadata: {
+                    taskTitle: 'Clean Kitchen',
+                    senderName: 'Jane Smith'
+                },
+                createdAt: new Date()
+            };
+            
+            showNotification(notification);
+            if (soundEnabled) {
+                playNotificationSound();
+            }
+        }
+
+        // Handle sound preference toggle
+        document.getElementById('soundEnabled').addEventListener('change', (e) => {
+            soundEnabled = e.target.checked;
+            console.log('Sound enabled:', soundEnabled);
+            
+            if (socket && socket.connected) {
+                socket.emit('update-sound-preference', {
+                    userId: userId,
+                    soundEnabled: soundEnabled
+                });
+            }
+            
+            showNotification({
+                type: 'SETTING',
+                title: 'Sound Settings',
+                message: `Notification sounds ${soundEnabled ? 'enabled' : 'disabled'}`,
+                priority: 'NORMAL',
+                playSound: false
+            });
+        });
+
+        // Auto-connect when page loads
+        window.addEventListener('load', () => {
+            console.log('Page loaded. Click "Connect to Notifications" to start testing.');
+        });
+    </script>
+</body>
+</html>
