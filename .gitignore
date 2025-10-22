@@ -4,3 +4,29 @@ build/
 .idea/
 .vscode/
 .DS_Store
+
+# Security - Sensitive files
+serviceAccountKey.json
+*.pem
+*.p12
+*.key
+.env
+.env.local
+.env.production
+config/secrets.js
+
+# AWS credentials
+aws-credentials.json
+credentials.json
+
+# Twilio credentials
+twilio-config.json
+
+# Firebase config
+firebase-config.json
+firebase-adminsdk-*.json
+
+# Any other potential secret files
+secrets/
+credentials/
+*.secret
