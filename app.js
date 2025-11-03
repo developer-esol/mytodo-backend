@@ -1,17 +1,15 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const morgan = require("morgan");
 const helmet = require("helmet");
 const path = require("path");
+const logger = require("./config/logger");
 require("dotenv").config();
 
 const app = express();
 
-// Enable CORS for all routes in development
 app.use(cors());
 
-// Additional headers for better CORS support
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header(
@@ -30,7 +28,6 @@ app.use((req, res, next) => {
   }
 });
 
-// Increase header size limit to handle larger requests
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -68,7 +65,6 @@ app.use(
 
 // Rest of middleware
 app.use(helmet());
-app.use(morgan("dev"));
 
 // Serve static files from public directory with CORS headers
 app.use(
@@ -117,16 +113,14 @@ app.use((req, res, next) => {
   const headerString = JSON.stringify(req.headers);
   if (headerString.length > 8192) {
     // 8KB limit
-    console.log("Headers too large, attempting to reduce payload size");
+    logger.warn("Headers too large", {
+      file: "app.js",
+      headerSize: headerString.length,
+      path: req.path,
+    });
   }
   next();
 });
-
-// Database connection
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.error("MongoDB connection error:", err));
 
 // Routes
 app.use("/api/tasks", taskRoutes); // Standard task routes
@@ -184,10 +178,12 @@ app.post("/api/chats/:taskId/upload", (req, res) => {
       path: `/uploads/chats/${req.params.taskId}/${file.filename}`,
     }));
 
-    console.log(
-      `✅ Files uploaded for task ${req.params.taskId}:`,
-      uploadedFiles.map((f) => f.originalName)
-    );
+    logger.info("Files uploaded for task", {
+      file: "app.js",
+      taskId: req.params.taskId,
+      fileCount: uploadedFiles.length,
+      files: uploadedFiles.map((f) => f.originalName),
+    });
     res.json({
       success: true,
       message: "Files uploaded successfully",
@@ -209,7 +205,13 @@ swaggerDocs(app);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  logger.error("Unhandled error:", {
+      file: "app.js",
+    error: err.message,
+    stack: err.stack,
+    path: req.path,
+    method: req.method,
+  });
   res.status(500).json({
     success: false,
     error: "Internal Server Error",
@@ -217,3 +219,5 @@ app.use((err, req, res, next) => {
 });
 
 module.exports = app;
+
+

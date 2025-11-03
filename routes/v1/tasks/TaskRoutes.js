@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const taskController = require("../../../controllers/taskController");
+const myTaskController = require("../../../controllers/tasks/task.controller");
 const { protect } = require("../../../middleware/authMiddleware");
 const { uploadFiles } = require("../../../middleware/uploadMiddleware");
 const {
@@ -9,7 +9,6 @@ const {
   handleUploadError,
   logUploadedFiles,
 } = require("../../../middleware/uploadQA");
-const myTaskController = require("../../../controllers/myTaskController");
 const validators = require("../../../validators/v1/tasks/tasks.validator");
 
 // Route handlers
@@ -17,115 +16,108 @@ const createTaskHandler = [
   protect,
   uploadFiles,
   validators.createTask,
-  taskController.createTask,
+  myTaskController.createTask,
 ];
 
 // Add search route before other routes
-router.get("/search", taskController.searchTasks);
+router.get("/search", myTaskController.searchTasks);
 
 // Standard routes under /api/tasks
-router
-  .route("/")
-  .post(createTaskHandler)
-  .get(validators.getTasks, taskController.getTasks);
+router.post("/", createTaskHandler);
+router.get("/", ...validators.getTasks, myTaskController.getTasks);
 
 // Add specific route for post-task (to maintain backward compatibility)
 router.post("/post-task", createTaskHandler);
 
 // Add this new route for user's tasks
-router.route("/my-tasks").get(
+router.get(
+  "/my-tasks",
   protect,
-  validators.getMyTasks,
-  myTaskController.getMyTasks // Only call the main getMyTasks handler
+  ...validators.getMyTasks,
+  myTaskController.getMyTasks
 );
 
 // Add new route for user's offers
-router
-  .route("/my-offers")
-  .get(protect, validators.getMyTasks, myTaskController.getMyTasks);
+router.get("/my-offers", protect, myTaskController.getMyOffers);
 
 // Task acceptance route - add this before other routes
 router.post("/:id/accept", protect);
 
-router
-  .route("/:id")
-  .get(validators.getTaskById, taskController.getTask)
-  .put(protect, validators.updateTask, taskController.updateTask)
-  .delete(protect, validators.deleteTask, taskController.deleteTask);
+// Task CRUD routes
+router.get("/:id", ...validators.getTaskById, myTaskController.getTask);
+router.put(
+  "/:id",
+  protect,
+  ...validators.updateTask,
+  myTaskController.updateTask
+);
+router.delete(
+  "/:id",
+  protect,
+  ...validators.deleteTask,
+  myTaskController.deleteTask
+);
 
 // Offer-related routes
-router
-  .route("/:id/offers")
-  .get(validators.getTaskById, taskController.getTaskWithOffers)
-  .post(protect, validators.createOffer, taskController.createTaskOffer);
+router.get(
+  "/:id/offers",
+  ...validators.getTaskById,
+  myTaskController.getTaskWithOffers
+);
+router.post(
+  "/:id/offers",
+  protect,
+  ...validators.createOffer,
+  myTaskController.createTaskOffer
+);
 
 // Specific offer actions
-router
-  .route("/:taskId/offers/:offerId/accept")
-  .post(
-    protect,
-    validators.acceptOffer,
-    myTaskController.getMyTasks,
-    myTaskController.acceptOffer
-  ) // Accept an offer
-  .put(protect, validators.acceptOffer, myTaskController.acceptOffer); // Accept an offer
-
-// Legacy routes (duplicate for backward compatibility)
-router.route("/").post(createTaskHandler); // This will handle POST /api/post-task
-
-// Payment-related routes
 router.post(
-  "/:taskId/complete-payment",
+  "/:taskId/offers/:offerId/accept",
   protect,
-  validators.completePayment,
-  taskController.completeTaskPayment
+  ...validators.acceptOffer,
+  myTaskController.acceptOffer
 );
 
-// Tasks with payment status
+// Question and Answer routes
 router.get(
-  "/my-tasks/payment-status",
-  protect,
-  taskController.getTasksWithPaymentStatus
+  "/:taskId/questions",
+  ...validators.completeTask,
+  myTaskController.getTaskQuestions
 );
-router
-  .route("/:taskId/questions")
-  .get(validators.completeTask, taskController.getTaskQuestions) // Get all questions for a task
-  .post(
-    protect,
-    uploadQuestionImages,
-    handleUploadError,
-    logUploadedFiles,
-    validators.createQuestion,
-    taskController.createQuestion
-  ); // Post new question with images
 
-router
-  .route("/:taskId/questions/:questionId/answer")
-  .post(
-    protect,
-    uploadAnswerImages,
-    handleUploadError,
-    logUploadedFiles,
-    validators.answerQuestion,
-    taskController.answerQuestion
-  ); // Answer a question with images
-// router.post(/questions,
-// protect,
-// taskController.createQuestion
-// );
+router.post(
+  "/:taskId/questions",
+  protect,
+  uploadQuestionImages,
+  handleUploadError,
+  logUploadedFiles,
+  ...validators.createQuestion,
+  myTaskController.createQuestion
+);
 
-// Add this route in TaskRoutes.js
+router.post(
+  "/:taskId/questions/:questionId/answer",
+  protect,
+  uploadAnswerImages,
+  handleUploadError,
+  logUploadedFiles,
+  ...validators.answerQuestion,
+  myTaskController.answerQuestion
+);
+
+// Task completion routes
 router.patch(
   "/:taskId/complete",
   protect,
-  validators.completeTask,
+  ...validators.completeTask,
   myTaskController.completeTask
 );
-// Frontend expects PUT, so add PUT route as well
+
 router.put(
   "/:taskId/complete",
   protect,
-  validators.completeTask,
+  ...validators.completeTask,
   myTaskController.completeTask
 );
 
@@ -133,7 +125,7 @@ router.put(
 router.get(
   "/:taskId/completion-status",
   protect,
-  validators.completeTask,
+  ...validators.completeTask,
   myTaskController.checkTaskCompletionStatus
 );
 
@@ -141,19 +133,24 @@ router.get(
 router.put(
   "/:taskId/cancel",
   protect,
-  validators.cancelTask,
+  ...validators.cancelTask,
   myTaskController.cancelTask
 );
 
-router
-  .route("/:id/status")
-  .put(protect, validators.updateTaskStatus, taskController.updateTaskStatus);
+// Update task status route
+router.put(
+  "/:id/status",
+  protect,
+  ...validators.updateTaskStatus,
+  myTaskController.updateTaskStatus
+);
 
-router
-  .route("/:id/complete")
-  .patch(protect, validators.completeTask, myTaskController.completeTask);
-
-router.route("/:id/accept").post(protect, myTaskController.acceptOffer);
+// Get task with all offers
+router.get(
+  "/:id/with-offers",
+  ...validators.getTaskById,
+  myTaskController.getTaskWithOffers
+);
 
 // Get tasks for a specific user
 router

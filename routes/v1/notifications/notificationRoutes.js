@@ -1,7 +1,7 @@
 // routes/notificationRoutes.js
 const express = require("express");
 const router = express.Router();
-const notificationController = require("../../../controllers/notificationController");
+const notificationController = require("../../../controllers/notifications/notification.controller");
 const { protect } = require("../../../middleware/authMiddleware");
 const validators = require("../../../validators/v1/notifications/notifications.validator");
 
@@ -19,7 +19,7 @@ router.use((req, res, next) => {
 router.get("/test-frontend", async (req, res) => {
   try {
     // Use the service directly - same as controller uses
-    const notificationService = require("../../../services/notificationService");
+    const notificationService = require("../../../shared/services/notificationService");
     const userId = "68d295e638cbeb79a7d7cf8e"; // Kasun's user ID
 
     const result = await notificationService.getUserNotifications(userId, {
@@ -70,7 +70,7 @@ router.get("/test-frontend", async (req, res) => {
 });
 
 // Webhook endpoint (no auth required) - must come before auth middleware
-router.post("/webhook", validators.webhookNotification, async (req, res) => {
+router.post("/webhook", ...validators.webhookNotification, async (req, res) => {
   try {
     const {
       userId,
@@ -122,7 +122,7 @@ router.use(protect);
 // Get user notifications with pagination
 router.get(
   "/",
-  validators.getNotifications,
+  ...validators.getNotifications,
   notificationController.getNotifications
 );
 
@@ -141,7 +141,7 @@ router.get("/debug", notificationController.debugUserInfo);
 // Get notifications by type
 router.get(
   "/type/:type",
-  validators.getNotificationsByType,
+  ...validators.getNotificationsByType,
   notificationController.getNotificationsByType
 );
 
@@ -154,28 +154,28 @@ router.put("/read-all", notificationController.markAllAsRead);
 // Create a test notification (development only)
 router.post(
   "/test",
-  validators.testNotification,
+  ...validators.testNotification,
   notificationController.testNotification
 );
 
 // Create a test notification with sound alert
 router.post(
   "/test-sound",
-  validators.testSoundNotification,
+  ...validators.testSoundNotification,
   notificationController.testSoundNotification
 );
 
 // Mark a specific notification as read
 router.patch(
   "/:notificationId/read",
-  validators.validateNotificationId,
+  ...validators.validateNotificationId,
   notificationController.markAsRead
 );
 
 // Delete a notification
 router.delete(
   "/:notificationId",
-  validators.validateNotificationId,
+  ...validators.validateNotificationId,
   notificationController.deleteNotification
 );
 

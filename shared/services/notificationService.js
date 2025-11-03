@@ -1,9 +1,10 @@
 // services/notificationService.js
 const mongoose = require("mongoose");
-const Notification = require("../models/notification/Notification");
-const User = require("../models/user/User");
-const Task = require("../models/task/Task");
-const Offer = require("../models/task/Offer");
+const Notification = require("../../models/notification/Notification");
+const User = require("../../models/user/User");
+const Task = require("../../models/task/Task");
+const Offer = require("../../models/task/Offer");
+const logger = require("../../config/logger");
 
 class NotificationService {
   /**
@@ -19,7 +20,11 @@ class NotificationService {
 
       return notification;
     } catch (error) {
-      console.error("Error creating notification:", error);
+      logger.error("Error creating notification:", {
+      service: "notificationService",
+        error: error.message,
+        stack: error.stack,
+      });
       throw error;
     }
   }
@@ -55,24 +60,36 @@ class NotificationService {
             isRead: notification.isRead,
           });
 
-        console.log(
-          `🔔 Real-time notification sent to user ${
-            notification.recipient._id
-          }: ${notification.type} ${
-            shouldPlaySound ? "(with sound)" : "(silent)"
-          }`
+        logger.info(
+          `Real-time notification sent to user ${notification.recipient._id}`,
+          {
+            type: notification.type,
+            playSound: shouldPlaySound,
+            userId: notification.recipient._id,
+          }
         );
       } else {
-        console.log(
-          `⚠️ Socket.io not available - notification created but not broadcast: ${notification.type}`
+        logger.warn(
+          `Socket.io not available - notification created but not broadcast`,
+          {
+            type: notification.type,
+            userId: notification.recipient?._id,
+          }
         );
       }
 
-      console.log(
-        `Webhook notification sent for user ${notification.recipient._id}: ${notification.type}`
+      logger.debug(
+        `Webhook notification sent for user ${notification.recipient._id}`,
+        {
+          type: notification.type,
+        }
       );
     } catch (error) {
-      console.error("Error sending webhook notification:", error);
+      logger.error("Error sending webhook notification:", {
+      service: "notificationService",
+        error: error.message,
+        stack: error.stack,
+      });
     }
   }
 
@@ -404,7 +421,11 @@ class NotificationService {
 
       return Promise.all(notifications);
     } catch (error) {
-      console.error("Error creating group chat message notifications:", error);
+      logger.error("Error creating group chat message notifications:", {
+      service: "notificationService",
+        error: error.message,
+        stack: error.stack,
+      });
       throw error;
     }
   }
@@ -636,3 +657,5 @@ class NotificationService {
 }
 
 module.exports = new NotificationService();
+
+

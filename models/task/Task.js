@@ -2,8 +2,8 @@ const mongoose = require("mongoose");
 
 const TaskSchema = new mongoose.Schema(
   {
-    title: {type: String, required: true},
-    categories: {type: [String], required: true},
+    title: { type: String, required: true },
+    categories: { type: [String], required: true },
     locationType: {
       type: String,
       enum: ["In-person", "Online"],
@@ -17,51 +17,61 @@ const TaskSchema = new mongoose.Schema(
       required: true,
     },
     dateRange: {
-      start: {type: Date, required: true},
-      end: {type: Date, required: true},
+      start: { type: Date, required: true },
+      end: { type: Date, required: true },
     },
     // ADD BACK MISSING FIELDS
-    time: {type: String, required: true},
+    time: { type: String, required: true },
     location: {
-      address: {type: String},
+      address: { type: String },
       coordinates: {
-        type: new mongoose.Schema({
-          type: {
-            type: String,
-            enum: ["Point"],
-            default: "Point"
+        type: new mongoose.Schema(
+          {
+            type: {
+              type: String,
+              enum: ["Point"],
+              default: "Point",
+            },
+            coordinates: {
+              type: [Number],
+              index: "2dsphere",
+            },
           },
-          coordinates: {
-            type: [Number],
-            index: '2dsphere'
-          }
-        }, { _id: false }),
+          { _id: false }
+        ),
         required: false,
-        default: undefined  // Don't create this field if not provided
+        default: undefined, // Don't create this field if not provided
       },
     },
     // Moving-specific fields for mobile app
-    isMovingTask: {type: Boolean, default: false},
+    isMovingTask: { type: Boolean, default: false },
     movingDetails: {
       pickupLocation: {
-        address: {type: String},
-        postalCode: {type: String}
+        address: { type: String },
+        postalCode: { type: String },
       },
       dropoffLocation: {
-        address: {type: String},
-        postalCode: {type: String}
-      }
+        address: { type: String },
+        postalCode: { type: String },
+      },
     },
-    details: {type: String, required: true},
-    budget: {type: Number, required: true},
-    currency: {type: String, required: true, default: "USD"},
-    images: [{type: String}],
+    details: { type: String, required: true },
+    budget: { type: Number, required: true },
+    currency: { type: String, required: true, default: "USD" },
+    images: [{ type: String }],
     // KEEP NEW IMPROVEMENTS
     status: {
       type: String,
-      enum: ["open", "todo", "done", "completed", "cancelled", "expired", "overdue"],
+      enum: [
+        "open",
+        "todo",
+        "done",
+        "completed",
+        "cancelled",
+        "expired",
+        "overdue",
+      ],
       default: "open",
-      index: true,
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -79,24 +89,24 @@ const TaskSchema = new mongoose.Schema(
     statusHistory: [
       {
         status: String,
-        changedAt: {type: Date, default: Date.now},
-        changedBy: {type: mongoose.Schema.Types.ObjectId, ref: "User"},
+        changedAt: { type: Date, default: Date.now },
+        changedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         reason: String,
       },
     ],
   },
   {
     timestamps: true,
-    toJSON: {virtuals: true},
-    toObject: {virtuals: true},
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
 
 // Indexes for better performance
-TaskSchema.index({createdBy: 1});
-TaskSchema.index({assignedTo: 1});
-TaskSchema.index({status: 1});
-TaskSchema.index({"dateRange.end": 1});
+TaskSchema.index({ createdBy: 1 });
+TaskSchema.index({ assignedTo: 1 });
+TaskSchema.index({ status: 1 });
+TaskSchema.index({ "dateRange.end": 1 });
 
 // Virtual for offers
 TaskSchema.virtual("offers", {
@@ -111,8 +121,8 @@ TaskSchema.post("save", async function (doc) {
     try {
       const Transaction = mongoose.model("Transaction");
       await Transaction.updateMany(
-        {taskId: doc._id},
-        {$set: {taskStatus: doc.status}}
+        { taskId: doc._id },
+        { $set: { taskStatus: doc.status } }
       );
     } catch (error) {
       console.error("Error updating transactions:", error);

@@ -2,11 +2,11 @@
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
-const Receipt = require("../models/payment/Receipt");
-const Task = require("../models/task/Task");
-const Offer = require("../models/task/Offer");
-const Payment = require("../models/payment/Payment");
-const User = require("../models/user/User");
+const Receipt = require("../../models/payment/Receipt");
+const Task = require("../../models/task/Task");
+const Offer = require("../../models/task/Offer");
+const Payment = require("../../models/payment/Payment");
+const User = require("../../models/user/User");
 
 /**
  * Tax configuration for different countries

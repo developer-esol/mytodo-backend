@@ -1,20 +1,18 @@
 const express = require("express");
 const router = express.Router();
 const { protect } = require("../../../middleware/authMiddleware");
-const { uploadFiles } = require("../../../middleware/uploadMiddleware");
-const chatController = require("../../../controllers/chatController");
+const controller = require("../../../controllers/chat/chat.controller");
 const validators = require("../../../validators/v1/chat/chat.validator");
-// Route handlers
 
-// Add search route before other routes - now with authentication
-router.get("/", protect, chatController.getChats);
+// Get all chats for authenticated user
+router.get("/", protect, controller.getChats);
 
-// Create or update chat endpoint
+// Create or update chat when offer is accepted
 router.post(
   "/create-or-update",
   protect,
-  validators.createOrUpdateChat,
-  chatController.createOrUpdateChat
+  ...validators.createOrUpdateChat,
+  controller.createOrUpdateChat
 );
 
 module.exports = router;

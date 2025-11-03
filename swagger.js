@@ -16,9 +16,6 @@ const options = {
     ],
   },
   apis: [
-    // "./routes/docs/*.js",
-    //  "./routes/docs/**/*.js", // Include subdirectories like admin
-    // twoFactorAuth.swagger.yaml
     "./routes/v1/auth/auth.swagger.yaml",
     "./routes/v1/auth/twoFactorAuth.swagger.yaml",
     "./routes/v1/categories/category.swagger.yaml",

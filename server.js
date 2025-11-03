@@ -32,10 +32,12 @@ const connectDB = require("./config/db");
 const app = require("./app");
 const http = require("http");
 const socketIo = require("socket.io");
+const logger = require("./config/logger");
 
 // Connect to database before starting server
 connectDB()
   .then(() => {
+    logger.info("MongoDB connected successfully");
     // Set up CORS headers middleware
     app.use((req, res, next) => {
       res.header("Access-Control-Allow-Origin", "http://localhost:5173");
@@ -144,20 +146,26 @@ connectDB()
             playSound: true,
             createdAt: new Date(),
           });
-          console.log(`🧪 Test notification sent to user ${userId}`);
+          logger.debug(`Test notification sent to user ${userId}`);
         }
       });
     });
 
     server.listen(process.env.PORT || 5001, () => {
-      console.log(`🚀 Server running on port ${process.env.PORT || 5001}`);
-      console.log(`🔗 Socket.io enabled for real-time notifications`);
+      logger.info(`Server running on port ${process.env.PORT || 5001}`);
+      logger.info(`Socket.io enabled for real-time notifications`);
     });
 
     // Increase header size limit
     server.maxHeadersCount = 0;
   })
   .catch((err) => {
-    console.error("Database connection failed", err);
+    logger.error("Database connection failed", {
+      file: "server.js",
+      error: err.message,
+      stack: err.stack,
+    });
     process.exit(1);
   });
+
+

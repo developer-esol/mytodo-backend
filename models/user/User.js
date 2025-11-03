@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true },
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
-    phone: { type: String, unique: true, sparse: true }, // Optional phone field
+    phone: { type: String }, // Optional phone field
     password: {
       type: String,
       required: function () {
@@ -233,5 +233,8 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
   const bcrypt = require("bcryptjs");
   return await bcrypt.compare(candidatePassword, this.password);
 };
+
+// Create unique sparse index for phone
+userSchema.index({ phone: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("User", userSchema);

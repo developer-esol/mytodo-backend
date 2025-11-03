@@ -5,7 +5,6 @@ const ReceiptSchema = new mongoose.Schema(
     receiptNumber: {
       type: String,
       required: true,
-      unique: true,
     },
     task: {
       type: mongoose.Schema.Types.ObjectId,
@@ -159,20 +158,25 @@ ReceiptSchema.pre("save", async function (next) {
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, "0");
       const day = String(date.getDate()).padStart(2, "0");
-      
+
       // Find the last receipt number for today
-      const lastReceipt = await this.constructor.findOne({
-        receiptNumber: new RegExp(`^MT${year}${month}${day}`),
-      }).sort({ receiptNumber: -1 });
-      
+      const lastReceipt = await this.constructor
+        .findOne({
+          receiptNumber: new RegExp(`^MT${year}${month}${day}`),
+        })
+        .sort({ receiptNumber: -1 });
+
       let sequence = 1;
       if (lastReceipt) {
         const lastSequence = parseInt(lastReceipt.receiptNumber.slice(-4));
         sequence = lastSequence + 1;
       }
-      
+
       // Format: MT20251008-0001 (MyToDoo + YYYYMMDD + sequence)
-      this.receiptNumber = `MT${year}${month}${day}-${String(sequence).padStart(4, "0")}`;
+      this.receiptNumber = `MT${year}${month}${day}-${String(sequence).padStart(
+        4,
+        "0"
+      )}`;
     } catch (error) {
       console.error("Error generating receipt number:", error);
       // Fallback to timestamp-based number
@@ -183,7 +187,7 @@ ReceiptSchema.pre("save", async function (next) {
 });
 
 // Indexes for better performance
-ReceiptSchema.index({ receiptNumber: 1 });
+ReceiptSchema.index({ receiptNumber: 1 }, { unique: true });
 ReceiptSchema.index({ task: 1 });
 ReceiptSchema.index({ poster: 1 });
 ReceiptSchema.index({ tasker: 1 });

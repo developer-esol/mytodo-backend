@@ -6,25 +6,25 @@ const {
   createPaymentIntent,
   verifyPayment,
   confirmTaskCompletion,
-} = require("../../../controllers/paymentController");
+} = require("../../../controllers/payments/payment.controller");
 const validators = require("../../../validators/v1/payments/payment.validator");
 
 // Create payment intent
 router.post(
   "/create-intent",
   protect,
-  validators.createPaymentIntent,
+  ...validators.createPaymentIntent,
   createPaymentIntent
 );
 
 // Verify payment
-router.post("/verify", protect, validators.verifyPayment, verifyPayment);
+router.post("/verify", protect, ...validators.verifyPayment, verifyPayment);
 
 // Complete task and release payment
 router.post(
   "/complete/:taskId",
   protect,
-  validators.confirmTaskCompletion,
+  ...validators.confirmTaskCompletion,
   confirmTaskCompletion
 );
 

@@ -6,7 +6,7 @@ const {
   getReceiptById,
   downloadReceiptPDF,
   getTaskReceipts,
-} = require("../../../controllers/receiptController");
+} = require("../../../controllers/receipts/receipt.controller");
 const { protect } = require("../../../middleware/authMiddleware");
 const validators = require("../../../validators/v1/payments/receipt.validator");
 
@@ -14,7 +14,7 @@ const validators = require("../../../validators/v1/payments/receipt.validator");
 // @route   GET /api/receipts
 // @access  Private
 // @query   receiptType (payment|earnings), page, limit
-router.get("/", protect, validators.getMyReceipts, getMyReceipts);
+router.get("/", protect, ...validators.getMyReceipts, getMyReceipts);
 
 // @desc    Get receipts for a specific task
 // @route   GET /api/receipts/task/:taskId
@@ -22,14 +22,19 @@ router.get("/", protect, validators.getMyReceipts, getMyReceipts);
 router.get(
   "/task/:taskId",
   protect,
-  validators.getTaskReceipts,
+  ...validators.getTaskReceipts,
   getTaskReceipts
 );
 
 // @desc    Get specific receipt details
 // @route   GET /api/receipts/:receiptId
 // @access  Private
-router.get("/:receiptId", protect, validators.getReceiptById, getReceiptById);
+router.get(
+  "/:receiptId",
+  protect,
+  ...validators.getReceiptById,
+  getReceiptById
+);
 
 // @desc    Download receipt as PDF
 // @route   GET /api/receipts/:receiptId/download
@@ -37,7 +42,7 @@ router.get("/:receiptId", protect, validators.getReceiptById, getReceiptById);
 router.get(
   "/:receiptId/download",
   protect,
-  validators.downloadReceiptPDF,
+  ...validators.downloadReceiptPDF,
   downloadReceiptPDF
 );
 

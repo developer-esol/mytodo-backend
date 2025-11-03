@@ -1,44 +1,15 @@
 const express = require("express");
 const router = express.Router();
-const categoryController = require("../../../controllers/categoryController");
+const controller = require("../../../controllers/categories/categories.controller");
 const { protect } = require("../../../middleware/authMiddleware");
 const validator = require("../../../validators/v1/categories/categories.validator");
 
-// Enable CORS for this router
-router.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header(
-    "Access-Control-Allow-Methods",
-    "GET,PUT,POST,DELETE,PATCH,OPTIONS"
-  );
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, Content-Length, X-Requested-With"
-  );
-  if (req.method === "OPTIONS") {
-    res.sendStatus(200);
-  } else {
-    next();
-  }
-});
-
 // Public routes
-router.get("/", categoryController.getCategories);
-router.get("/by-location", categoryController.getCategoriesByLocationType);
+router.get("/", controller.getCategories);
+router.get("/by-location", controller.getCategoriesByLocationType);
 
 // Protected routes (admin only)
-router.post(
-  "/",
-  protect,
-  validator.createCategory,
-  categoryController.createCategory
-);
-router.put(
-  "/:id",
-  protect,
-  validator.updateCategory,
-  categoryController.updateCategory
-);
-router.delete("/:id", protect, categoryController.deleteCategory);
+router.post("/", protect, validator.createCategory, controller.createCategory);
+router.delete("/:id", protect, controller.deleteCategory);
 
 module.exports = router;

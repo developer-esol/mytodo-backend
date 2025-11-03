@@ -8,7 +8,7 @@ const Chat = require("../../../models/chat/Chat");
 const Task = require("../../../models/task/Task");
 const User = require("../../../models/user/User");
 const Offer = require("../../../models/task/Offer");
-const notificationService = require("../../../services/notificationService");
+const notificationService = require("../../../shared/services/notificationService");
 const { protect } = require("../../../middleware/authMiddleware");
 const validators = require("../../../validators/v1/chat/firebase.validator");
 
