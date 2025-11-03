@@ -1,0 +1,271 @@
+openapi: 3.0.0
+info:
+  title: Chat & Messaging API
+  version: 1.0.0
+  description: Endpoints for fetching user chats and updating chat status, primarily triggered by offer acceptance.
+servers:
+  - url: /api/chats
+    description: Chat routes base path
+
+tags:
+  - name: Chat
+    description: Core messaging and conversation management.
+
+paths:
+  /ChatApp/:
+    get:
+      tags: [Chat]
+      summary: Get all chats for the authenticated user
+      description: Retrieves a list of chats where the authenticated user is either the poster or the tasker. Includes related task and participant data.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: List of chats returned successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  count:
+                    type: integer
+                    example: 2
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ChatListItem"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /ChatApp/create-or-update:
+    post:
+      tags: [Chat]
+      summary: Update chat status when an offer is accepted (Protected)
+      description: This endpoint is typically called internally to update the chat status to 'accept' and 'active' after a task offer is accepted.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrUpdateChatRequest"
+      responses:
+        "200":
+          description: Chat status updated successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/ChatObject"
+                  message:
+                    type: string
+                    example: "Chat status updated to accept successfully"
+        "400":
+          description: Invalid input (e.g., missing IDs, invalid action/status, invalid ID format).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missingFields:
+                  value:
+                    {
+                      success: false,
+                      message: "TaskId, offerId, and userId are required",
+                    }
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          description: Offer, Task, or Chat not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                offerNotFound:
+                  value: { success: false, message: "Offer not found" }
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Authorization header containing the JWT token.
+
+  schemas:
+    # --- Reusable Objects ---
+
+    UserParticipant:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: User's MongoDB ID.
+          example: "60c72b2f9b1e8b0015f8a7e3"
+        firstName:
+          type: string
+          example: "Alice"
+        lastName:
+          type: string
+          example: "Johnson"
+        avatar:
+          type: string
+          description: URL or path to the user's profile picture.
+          example: "/avatars/alice.png"
+        rating:
+          type: number
+          format: float
+          example: 4.8
+
+    TaskReference:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: MongoDB ID of the task.
+          example: "654e95d51d1a6d001f31f5a2"
+        title:
+          type: string
+          example: "Fix leaky faucet in kitchen"
+        status:
+          type: string
+          enum: [open, assigned, completed, cancelled]
+          example: "assigned"
+        budget:
+          type: number
+          example: 50
+        # Include other essential task fields here for context
+
+    ChatObject:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: "654e95d51d1a6d001f31f5a3"
+        taskId:
+          type: string
+          description: ID of the related task.
+          example: "654e95d51d1a6d001f31f5a2"
+        posterId:
+          $ref: "#/components/schemas/UserParticipant"
+        taskerId:
+          $ref: "#/components/schemas/UserParticipant"
+        status:
+          type: string
+          enum: [pending, active, completed, archived]
+          example: "active"
+        chatStatus:
+          type: string
+          enum: [initial, accept]
+          description: Tracks if the task offer has been accepted within the chat context.
+          example: "accept"
+        lastMessage:
+          type: object # Placeholder for message object
+          nullable: true
+        unreadCount:
+          type: integer
+          example: 0
+
+    ChatListItem:
+      type: object
+      description: The combined object returned by the GET /chats route.
+      properties:
+        chat:
+          type: object
+          description: The main chat document details.
+          allOf:
+            - $ref: "#/components/schemas/ChatObject"
+        task:
+          $ref: "#/components/schemas/TaskReference"
+          nullable: true
+        otherParticipant:
+          $ref: "#/components/schemas/UserParticipant"
+          description: The user who is not the currently authenticated user.
+        lastMessage:
+          type: object
+          nullable: true
+        unreadCount:
+          type: integer
+          example: 0
+
+    CreateOrUpdateChatRequest:
+      type: object
+      required:
+        - taskId
+        - offerId
+        - userId
+        - action
+        - chatStatus
+      properties:
+        taskId:
+          type: string
+          description: The MongoDB ID of the task.
+          example: "654e95d51d1a6d001f31f5a2"
+        offerId:
+          type: string
+          description: The MongoDB ID of the accepted offer.
+          example: "654e95d51d1a6d001f31f5a4"
+        userId:
+          type: string
+          description: The MongoDB ID of the user performing the action (usually the poster).
+          example: "60c72b2f9b1e8b0015f8a7e3"
+        action:
+          type: string
+          enum: [accept_offer]
+          description: The action being performed.
+          example: "accept_offer"
+        chatStatus:
+          type: string
+          enum: [accept]
+          description: The status to set on the chat document.
+          example: "accept"
+
+    # --- Standard Error Schema (reused) ---
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "Valid user ID is required"
+        error:
+          type: string
+          nullable: true
+          description: Detailed error message (e.g., stack trace or internal error code).
+
+  responses:
+    UnauthorizedError:
+      description: Unauthorized (Missing or invalid token)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            message: "Not authorized, token failed"
+    ServerError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            message: "Server error while fetching chats and tasks"
+            error: "MongooseError: ..."

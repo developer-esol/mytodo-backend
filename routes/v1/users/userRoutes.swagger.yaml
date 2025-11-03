@@ -1,0 +1,641 @@
+openapi: 3.0.0
+info:
+  title: User Authentication & Profile API
+  description: API endpoints for user registration, authentication, profile management, and avatar uploads
+  version: 1.0.0
+
+paths:
+  /users/signup:
+    post:
+      tags:
+        - Authentication
+      summary: User signup with email verification
+      description: Register a new user account. An OTP will be sent to the email for verification. Users must be 18+ years old.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - firstName
+                - lastName
+                - email
+                - password
+                - location
+                - dateOfBirth
+              properties:
+                firstName:
+                  type: string
+                  description: User's first name
+                  example: John
+                lastName:
+                  type: string
+                  description: User's last name
+                  example: Doe
+                email:
+                  type: string
+                  format: email
+                  description: User's email address
+                  example: john.doe@example.com
+                phone:
+                  type: string
+                  description: User's phone number (optional)
+                  example: +1234567890
+                password:
+                  type: string
+                  format: password
+                  description: User's password
+                  minLength: 6
+                dateOfBirth:
+                  type: string
+                  format: date
+                  description: User's date of birth (must be 18+ years old)
+                  example: 2000-01-15
+                location:
+                  type: object
+                  required:
+                    - country
+                    - region
+                    - city
+                  properties:
+                    country:
+                      type: string
+                      enum: [AU, NZ, LK]
+                      description: Country code (Australia, New Zealand, or Sri Lanka)
+                      example: AU
+                    countryCode:
+                      type: string
+                      description: Country code (defaults to country if not provided)
+                      example: AU
+                    region:
+                      type: string
+                      description: State or region
+                      example: New South Wales
+                    city:
+                      type: string
+                      description: City
+                      example: Sydney
+      responses:
+        201:
+          description: Signup successful, OTP sent to email
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Signup successful, OTP sent to email
+                  email:
+                    type: string
+                    example: john.doe@example.com
+        200:
+          description: User already pending verification, new OTP sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: New OTP sent to email
+                  email:
+                    type: string
+        400:
+          description: Validation error or user already exists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Email already in use
+                  success:
+                    type: boolean
+                    example: false
+                  field:
+                    type: string
+                    description: Field that failed validation (for age validation)
+                  currentAge:
+                    type: integer
+                    description: Current age calculated from DOB
+                  minimumAge:
+                    type: integer
+                    description: Minimum required age
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /users/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user with email and password. Returns JWT token and Firebase custom token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User's email address
+                  example: john.doe@example.com
+                password:
+                  type: string
+                  format: password
+                  description: User's password
+      responses:
+        200:
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: JWT authentication token (expires in 1 hour)
+                  firebaseToken:
+                    type: string
+                    description: Firebase custom token for real-time features
+                  user:
+                    $ref: "#/components/schemas/UserProfile"
+        400:
+          description: Invalid credentials or validation error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Invalid credentials
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /users/firebase-token:
+    get:
+      tags:
+        - Authentication
+      summary: Get Firebase custom token
+      description: Generate a Firebase custom token for the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Firebase token generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: Firebase custom token
+        401:
+          description: Unauthorized - invalid or missing token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Authorization token required
+        500:
+          description: Failed to generate Firebase token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Failed to generate Firebase token
+
+  /users/profile:
+    get:
+      tags:
+        - Profile
+      summary: Get user profile
+      description: Retrieve the authenticated user's profile information
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/UserProfileDetailed"
+        404:
+          description: User not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: User not found
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+
+    put:
+      tags:
+        - Profile
+      summary: Update user profile
+      description: Update the authenticated user's profile information including skills (supports both structured and legacy formats)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName:
+                  type: string
+                  description: User's first name
+                lastName:
+                  type: string
+                  description: User's last name
+                phone:
+                  type: string
+                  description: User's phone number
+                location:
+                  type: object
+                  properties:
+                    country:
+                      type: string
+                    countryCode:
+                      type: string
+                    region:
+                      type: string
+                    city:
+                      type: string
+                bio:
+                  type: string
+                  description: User biography
+                  maxLength: 500
+                skills:
+                  oneOf:
+                    - type: object
+                      description: Structured skills format (recommended)
+                      properties:
+                        goodAt:
+                          type: array
+                          items:
+                            type: string
+                          description: Skills user is good at
+                        transport:
+                          type: array
+                          items:
+                            type: string
+                          description: Transportation methods available
+                        languages:
+                          type: array
+                          items:
+                            type: string
+                          description: Languages spoken
+                        qualifications:
+                          type: array
+                          items:
+                            type: string
+                          description: Professional qualifications
+                        experience:
+                          type: array
+                          items:
+                            type: string
+                          description: Work experience
+                    - type: array
+                      description: Legacy skills format (array of strings)
+                      items:
+                        type: string
+      responses:
+        200:
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/UserProfileDetailed"
+        404:
+          description: User not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+
+  /users/avatar:
+    post:
+      tags:
+        - Profile
+      summary: Upload user avatar
+      description: Upload a profile picture for the authenticated user. Accepts image files up to 1MB. Creates base64 data URL or generates avatar if no file provided.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                avatar:
+                  type: string
+                  format: binary
+                  description: Avatar image file (optional, max 1MB)
+      responses:
+        200:
+          description: Avatar uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      avatar:
+                        type: string
+                        description: Avatar URL (data URL or generated avatar)
+                      user:
+                        $ref: "#/components/schemas/UserProfileDetailed"
+                  message:
+                    type: string
+                    example: Avatar uploaded successfully
+        400:
+          description: File too large or invalid file type
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: File too large. Please choose an image smaller than 1MB.
+        404:
+          description: User not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from login endpoint
+
+  schemas:
+    UserProfile:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: User ID
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: string
+        location:
+          type: object
+          properties:
+            country:
+              type: string
+              description: Country code (AU, NZ, LK)
+            countryCode:
+              type: string
+            region:
+              type: string
+            city:
+              type: string
+        age:
+          type: integer
+          description: Calculated age from date of birth
+        ageRange:
+          type: string
+          description: Age range for privacy (e.g., "18-24", "25-34")
+        avatar:
+          type: string
+          description: Avatar URL or data URL
+        role:
+          type: string
+          default: user
+          description: User role
+        isVerified:
+          type: boolean
+          description: Overall verification status
+        isEmailVerified:
+          type: boolean
+          description: Email verification status
+        isPhoneVerified:
+          type: boolean
+          description: Phone verification status
+
+    UserProfileDetailed:
+      allOf:
+        - $ref: "#/components/schemas/UserProfile"
+        - type: object
+          properties:
+            bio:
+              type: string
+              description: User biography
+            skills:
+              type: object
+              description: User skills in structured format
+              properties:
+                goodAt:
+                  type: array
+                  items:
+                    type: string
+                transport:
+                  type: array
+                  items:
+                    type: string
+                languages:
+                  type: array
+                  items:
+                    type: string
+                qualifications:
+                  type: array
+                  items:
+                    type: string
+                experience:
+                  type: array
+                  items:
+                    type: string
+            rating:
+              type: number
+              format: float
+              description: User average rating
+              default: 4.0
+            completedTasks:
+              type: integer
+              description: Number of completed tasks
+              default: 0
+            createdAt:
+              type: string
+              format: date-time
+              description: Account creation date
+
+    Location:
+      type: object
+      required:
+        - country
+        - region
+        - city
+      properties:
+        country:
+          type: string
+          enum: [AU, NZ, LK]
+          description: Country code
+        countryCode:
+          type: string
+          description: Country code (defaults to country)
+        region:
+          type: string
+          description: State or region
+        city:
+          type: string
+          description: City
+
+    Skills:
+      type: object
+      description: User skills in structured format
+      properties:
+        goodAt:
+          type: array
+          items:
+            type: string
+          description: Skills user is good at
+        transport:
+          type: array
+          items:
+            type: string
+          description: Transportation methods available
+        languages:
+          type: array
+          items:
+            type: string
+          description: Languages spoken
+        qualifications:
+          type: array
+          items:
+            type: string
+          description: Professional qualifications
+        experience:
+          type: array
+          items:
+            type: string
+          description: Work experience
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          description: Error message
+        error:
+          type: string
+          description: Detailed error message

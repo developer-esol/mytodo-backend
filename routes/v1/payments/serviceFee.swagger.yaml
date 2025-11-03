@@ -1,0 +1,273 @@
+openapi: 3.0.0
+info:
+  title: MyToDoo Service Fee API
+  version: 1.0.0
+  description: Service fee calculation and configuration API
+
+servers:
+  - url: /api/v1/service-fee
+    description: Service Fee API base path
+
+tags:
+  - name: Service Fee
+    description: Service fee calculation and configuration endpoints
+
+paths:
+  /service-fee/calculate:
+    post:
+      summary: Calculate service fee for a given amount
+      tags:
+        - Service Fee
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount
+              properties:
+                amount:
+                  type: number
+                  description: Budget amount
+                  example: 200
+                currency:
+                  type: string
+                  description: Currency code
+                  example: USD
+                  default: USD
+      responses:
+        "200":
+          description: Service fee calculation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  calculation:
+                    type: object
+                    properties:
+                      budgetAmount:
+                        type: number
+                        example: 200
+                      serviceFee:
+                        type: number
+                        example: 20
+                      totalAmount:
+                        type: number
+                        example: 220
+                      currency:
+                        type: string
+                        example: USD
+                      breakdown:
+                        type: object
+                        description: Detailed breakdown of the fee calculation
+        "400":
+          description: Invalid amount provided
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: Invalid amount provided
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /service-fee/config:
+    get:
+      summary: Get current service fee configuration
+      tags:
+        - Service Fee
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Current service fee configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  config:
+                    $ref: "#/components/schemas/ServiceFeeConfig"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+    put:
+      summary: Update service fee configuration (Admin only)
+      tags:
+        - Service Fee
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                BASE_PERCENTAGE:
+                  type: number
+                  description: Base percentage (0.10 for 10%)
+                  example: 0.12
+                MIN_FEE_USD:
+                  type: number
+                  description: Minimum fee in USD
+                  example: 7
+                MAX_FEE_USD:
+                  type: number
+                  description: Maximum fee in USD
+                  example: 75
+      responses:
+        "200":
+          description: Configuration updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Service fee configuration updated
+                  config:
+                    $ref: "#/components/schemas/ServiceFeeConfig"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: Admin access required
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /service-fee/test:
+    get:
+      summary: Run service fee calculation tests
+      tags:
+        - Service Fee
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Test results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  testOutput:
+                    type: string
+                    description: Test execution output
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ServiceFeeConfig:
+      type: object
+      properties:
+        BASE_PERCENTAGE:
+          type: number
+          description: Base percentage fee (e.g., 0.10 for 10%)
+          example: 0.10
+        MIN_FEE_USD:
+          type: number
+          description: Minimum fee in USD
+          example: 5
+        MAX_FEE_USD:
+          type: number
+          description: Maximum fee in USD
+          example: 50
+        CURRENCY_MULTIPLIERS:
+          type: object
+          description: Currency conversion multipliers
+          additionalProperties:
+            type: number
+
+    ServiceFeeCalculation:
+      type: object
+      properties:
+        budgetAmount:
+          type: number
+          description: Original budget amount
+        serviceFee:
+          type: number
+          description: Calculated service fee
+        totalAmount:
+          type: number
+          description: Total amount including service fee
+        currency:
+          type: string
+          description: Currency code
+        breakdown:
+          type: object
+          description: Detailed calculation breakdown
+
+  responses:
+    UnauthorizedError:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: string
+                example: Unauthorized
+
+    ServerError:
+      description: Server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: string
+                example: Internal server error

@@ -1,0 +1,575 @@
+openapi: 3.0.0
+info:
+  title: MyToDoo Reviews API
+  version: 1.0.0
+  description: Review and rating system for tasks and users
+
+servers:
+  - url: /api/v1/reviews
+    description: Reviews API base path
+
+tags:
+  - name: Reviews
+    description: Task and user review management endpoints
+
+paths:
+  /tasks/{taskId}/reviews:
+    post:
+      summary: Submit a review for a completed task
+      description: |
+        Submit a review for a task that has been completed. The reviewer must be either the task poster or tasker,
+        and the task must be in a completed state. Users can only review each task once.
+      tags:
+        - Reviews
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+          description: MongoDB ObjectId of the task to review
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - rating
+              properties:
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  description: Rating from 1 to 5 stars
+                  example: 4
+                reviewText:
+                  type: string
+                  maxLength: 1000
+                  description: Optional review text
+                  example: "Great work! Very professional and completed on time."
+      responses:
+        "201":
+          description: Review submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Review submitted successfully"
+                  data:
+                    $ref: "#/components/schemas/Review"
+        "400":
+          description: Invalid request data or user cannot review this task
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: "Invalid rating value"
+        "403":
+          description: User not authorized to review this task
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: "You can only review tasks you participated in"
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: "Task not found"
+        "409":
+          description: Review already exists for this task
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: "You have already reviewed this task"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+    get:
+      summary: Get all reviews for a specific task
+      description: Retrieve all reviews submitted for a specific task, including reviewer information and responses
+      tags:
+        - Reviews
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+          description: MongoDB ObjectId of the task
+      responses:
+        "200":
+          description: List of reviews for the task
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      taskId:
+                        type: string
+                        example: 507f1f77bcf86cd799439011
+                      reviews:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Review"
+                      totalCount:
+                        type: integer
+                        example: 2
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: "Task not found"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /tasks/{taskId}/can-review:
+    get:
+      summary: Check if current user can review a task
+      description: |
+        Check if the authenticated user is eligible to review a specific task.
+        Returns information about review eligibility and any existing review.
+      tags:
+        - Reviews
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+          description: MongoDB ObjectId of the task
+      responses:
+        "200":
+          description: Review eligibility information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      canReview:
+                        type: boolean
+                        description: Whether the user can submit a review
+                        example: true
+                      reason:
+                        type: string
+                        description: Explanation if review is not allowed
+                        example: "Task is not completed yet"
+                      existingReview:
+                        $ref: "#/components/schemas/Review"
+                        description: Existing review if user already reviewed this task
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: "Task not found"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /reviews/{reviewId}:
+    put:
+      summary: Update a review (only by the reviewer)
+      description: Update an existing review. Only the original reviewer can modify their review.
+      tags:
+        - Reviews
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: reviewId
+          required: true
+          schema:
+            type: string
+          description: MongoDB ObjectId of the review to update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  description: Updated rating from 1 to 5 stars
+                  example: 5
+                reviewText:
+                  type: string
+                  maxLength: 1000
+                  description: Updated review text
+                  example: "Excellent work! Highly recommended."
+      responses:
+        "200":
+          description: Review updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Review updated successfully"
+                  data:
+                    $ref: "#/components/schemas/Review"
+        "403":
+          description: Unauthorized to update this review
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: "You can only update your own reviews"
+        "404":
+          description: Review not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: "Review not found"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+    delete:
+      summary: Delete a review (only by the reviewer)
+      description: Delete an existing review. Only the original reviewer can delete their review.
+      tags:
+        - Reviews
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: reviewId
+          required: true
+          schema:
+            type: string
+          description: MongoDB ObjectId of the review to delete
+      responses:
+        "200":
+          description: Review deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Review deleted successfully"
+        "403":
+          description: Unauthorized to delete this review
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: "You can only delete your own reviews"
+        "404":
+          description: Review not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: "Review not found"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /reviews/{reviewId}/response:
+    post:
+      summary: Add a response to a review (only by the reviewee)
+      description: |
+        Add a response to a review. Only the person being reviewed (reviewee) can respond to reviews about them.
+        This allows taskers to respond to reviews from posters and vice versa.
+      tags:
+        - Reviews
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: reviewId
+          required: true
+          schema:
+            type: string
+          description: MongoDB ObjectId of the review to respond to
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - responseText
+              properties:
+                responseText:
+                  type: string
+                  maxLength: 500
+                  description: Response text from the reviewee
+                  example: "Thank you for the positive review! I'm glad I could help."
+      responses:
+        "200":
+          description: Response added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Response added successfully"
+                  data:
+                    $ref: "#/components/schemas/Review"
+        "403":
+          description: Unauthorized to respond to this review
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: "You can only respond to reviews about you"
+        "404":
+          description: Review not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: "Review not found"
+        "409":
+          description: Response already exists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: "A response already exists for this review"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Review:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 507f1f77bcf86cd799439012
+        task:
+          type: string
+          description: Task ObjectId
+          example: 507f1f77bcf86cd799439011
+        reviewer:
+          type: string
+          description: User ObjectId of the reviewer
+          example: 507f1f77bcf86cd799439013
+        reviewee:
+          type: string
+          description: User ObjectId of the person being reviewed
+          example: 507f1f77bcf86cd799439014
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 4
+        reviewText:
+          type: string
+          maxLength: 1000
+          example: "Great work! Very professional and completed on time."
+        response:
+          type: object
+          nullable: true
+          properties:
+            responseText:
+              type: string
+              maxLength: 500
+              example: "Thank you for the positive review!"
+            respondedAt:
+              type: string
+              format: date-time
+              example: 2024-10-28T15:30:00Z
+        createdAt:
+          type: string
+          format: date-time
+          example: 2024-10-28T14:00:00Z
+        updatedAt:
+          type: string
+          format: date-time
+          example: 2024-10-28T14:00:00Z
+
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 507f1f77bcf86cd799439013
+        firstName:
+          type: string
+          example: John
+        lastName:
+          type: string
+          example: Doe
+        email:
+          type: string
+          format: email
+          example: john.doe@example.com
+
+  responses:
+    UnauthorizedError:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: string
+                example: Unauthorized
+
+    ServerError:
+      description: Server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: string
+                example: Internal server error
+              message:
+                type: string
+                example: Database connection failed

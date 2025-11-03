@@ -1,0 +1,407 @@
+openapi: 3.0.0
+info:
+  title: MyToDoo Payment API
+  version: 1.0.0
+  description: Payment processing and task completion API with Stripe integration
+
+servers:
+  - url: /api/v1/payments
+    description: Payments API base path
+
+tags:
+  - name: Payments
+    description: Payment processing, verification, and task completion endpoints
+
+paths:
+  /payments/create-intent:
+    post:
+      summary: Create payment intent
+      description: |
+        Create a Stripe payment intent for a task offer. Calculates service fees based on the task budget.
+        The customer pays the total amount (budget + service fee), and the tasker receives the offer amount minus the service fee.
+      tags:
+        - Payments
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - taskId
+                - offerId
+              properties:
+                taskId:
+                  type: string
+                  description: MongoDB ObjectId of the task
+                  example: 507f1f77bcf86cd799439011
+                offerId:
+                  type: string
+                  description: MongoDB ObjectId of the accepted offer
+                  example: 507f191e810c19729de860ea
+      responses:
+        "200":
+          description: Payment intent created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  clientSecret:
+                    type: string
+                    description: Stripe client secret for payment confirmation
+                    example: pi_3ABC123xyz_secret_DEF456uvw
+                  breakdown:
+                    type: object
+                    description: Payment amount breakdown
+                    properties:
+                      budgetAmount:
+                        type: number
+                        description: Original task budget amount
+                        example: 200.00
+                      serviceFee:
+                        type: number
+                        description: Platform service fee
+                        example: 20.00
+                      totalCharge:
+                        type: number
+                        description: Total amount charged to customer
+                        example: 220.00
+                      taskerWillReceive:
+                        type: number
+                        description: Amount tasker will receive after service fee
+                        example: 180.00
+                      currency:
+                        type: string
+                        example: USD
+                  serviceFeeDetails:
+                    type: object
+                    description: Detailed service fee calculation breakdown
+                    properties:
+                      reason:
+                        type: string
+                        description: Explanation of how fee was calculated
+                        example: Standard 10% fee applied
+                      percentage:
+                        type: number
+                        example: 0.10
+                      minFee:
+                        type: number
+                        example: 5.00
+                      maxFee:
+                        type: number
+                        example: 50.00
+                  paymentId:
+                    type: string
+                    description: MongoDB ObjectId of the payment record
+                    example: 507f1f77bcf86cd799439012
+        "400":
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Invalid task or offer ID
+        "404":
+          description: Task or offer not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Task or offer not found
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /payments/verify:
+    post:
+      summary: Verify payment completion
+      description: |
+        Verify that a payment was successfully processed with Stripe and update the payment status.
+        Updates the task status to 'in_progress' after successful verification.
+      tags:
+        - Payments
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - paymentIntentId
+                - taskId
+              properties:
+                paymentIntentId:
+                  type: string
+                  description: Stripe payment intent ID
+                  example: pi_3ABC123xyz
+                taskId:
+                  type: string
+                  description: MongoDB ObjectId of the task
+                  example: 507f1f77bcf86cd799439011
+      responses:
+        "200":
+          description: Payment verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  payment:
+                    $ref: "#/components/schemas/Payment"
+        "400":
+          description: Payment not completed or invalid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: Payment not completed
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /payments/complete/{taskId}:
+    post:
+      summary: Complete task and release payment
+      description: |
+        Confirm task completion and capture the payment from Stripe.
+        This releases the held payment to the tasker and updates the task status.
+      tags:
+        - Payments
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+          description: MongoDB ObjectId of the task to complete
+      responses:
+        "200":
+          description: Task completion confirmed and payment released
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  task:
+                    $ref: "#/components/schemas/TaskCompletion"
+                  paymentIntent:
+                    type: object
+                    description: Stripe payment intent object
+                    properties:
+                      id:
+                        type: string
+                        example: pi_3ABC123xyz
+                      status:
+                        type: string
+                        example: succeeded
+                      amount:
+                        type: integer
+                        description: Amount in cents
+                        example: 22000
+                      currency:
+                        type: string
+                        example: usd
+        "404":
+          description: Task not found or no payment intent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Task not found or no payment intent
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          description: Server error during task completion
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: Failed to confirm task completion
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Payment:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 507f1f77bcf86cd799439012
+        task:
+          type: string
+          description: Task ObjectId
+          example: 507f1f77bcf86cd799439011
+        offer:
+          type: string
+          description: Offer ObjectId
+          example: 507f191e810c19729de860ea
+        user:
+          type: string
+          description: User (poster) ObjectId
+          example: 507f1f77bcf86cd799439013
+        tasker:
+          type: string
+          description: Tasker ObjectId
+          example: 507f1f77bcf86cd799439014
+        paymentIntentId:
+          type: string
+          description: Stripe payment intent ID
+          example: pi_3ABC123xyz
+        amount:
+          type: number
+          description: Total offer amount
+          example: 200.00
+        taskerAmount:
+          type: number
+          description: Amount tasker receives after service fee
+          example: 180.00
+        serviceFee:
+          type: number
+          description: Service fee deducted
+          example: 20.00
+        currency:
+          type: string
+          example: USD
+        status:
+          type: string
+          enum:
+            - pending
+            - completed
+            - failed
+            - refunded
+            - todo
+          example: completed
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    TaskCompletion:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 507f1f77bcf86cd799439011
+        title:
+          type: string
+          example: Clean my apartment
+        status:
+          type: string
+          enum:
+            - open
+            - assigned
+            - in_progress
+            - completed
+            - todo
+          example: todo
+        paymentIntentId:
+          type: string
+          example: pi_3ABC123xyz
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        budget:
+          type: number
+          example: 200.00
+        currency:
+          type: string
+          example: USD
+
+    PaymentBreakdown:
+      type: object
+      properties:
+        budgetAmount:
+          type: number
+          description: Original task budget
+          example: 200.00
+        serviceFee:
+          type: number
+          description: Platform service fee
+          example: 20.00
+        totalCharge:
+          type: number
+          description: Total charged to customer (budget + service fee)
+          example: 220.00
+        taskerWillReceive:
+          type: number
+          description: Amount tasker receives (offer amount)
+          example: 200.00
+        currency:
+          type: string
+          example: USD
+
+  responses:
+    UnauthorizedError:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: string
+                example: Unauthorized
+
+    ServerError:
+      description: Server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Payment processing failed
+              stack:
+                type: string
+                description: Error stack trace (development mode only)

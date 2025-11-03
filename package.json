@@ -34,6 +34,7 @@
     "firebase-admin": "^13.4.0",
     "google-auth-library": "^9.15.1",
     "helmet": "^8.1.0",
+    "jsdoc": "^4.0.5",
     "json2csv": "^6.0.0-alpha.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.13.2",

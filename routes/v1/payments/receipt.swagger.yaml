@@ -1,0 +1,515 @@
+openapi: 3.0.0
+info:
+  title: MyToDoo Receipt API
+  version: 1.0.0
+  description: Receipt management and PDF generation API
+
+servers:
+  - url: /api/v1/receipts
+    description: Receipts API base path
+
+tags:
+  - name: Receipts
+    description: Receipt management and download endpoints
+
+paths:
+  /receipts/:
+    get:
+      summary: Get user's receipts with pagination and filtering
+      description: Retrieve all receipts where the user is either the poster (paid) or tasker (earned)
+      tags:
+        - Receipts
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: receiptType
+          schema:
+            type: string
+            enum:
+              - payment
+              - earnings
+          description: Filter by receipt type (payment receipts for money paid, earnings receipts for money received)
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Page number for pagination
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+          description: Number of receipts per page
+      responses:
+        "200":
+          description: Receipts retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      receipts:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ReceiptSummary"
+                      pagination:
+                        $ref: "#/components/schemas/Pagination"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /receipts/task/{taskId}:
+    get:
+      summary: Get receipts for a specific task
+      description: Retrieve all receipts associated with a task. If no receipts exist and task is completed, will attempt to generate them.
+      tags:
+        - Receipts
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+          description: MongoDB ObjectId of the task
+      responses:
+        "200":
+          description: Task receipts retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      taskId:
+                        type: string
+                        example: 507f1f77bcf86cd799439011
+                      receipts:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ReceiptSummary"
+                  message:
+                    type: string
+                    example: No receipts available - payment not yet processed
+        "403":
+          description: Access denied to this task
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: Access denied to this task
+        "404":
+          description: Task or receipts not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: No receipts found for this task
+                  message:
+                    type: string
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /receipts/{receiptId}:
+    get:
+      summary: Get specific receipt details
+      description: Retrieve detailed information about a specific receipt including financial breakdown, task details, and involved parties
+      tags:
+        - Receipts
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: receiptId
+          required: true
+          schema:
+            type: string
+          description: MongoDB ObjectId of the receipt
+      responses:
+        "200":
+          description: Receipt details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/ReceiptDetails"
+        "403":
+          description: Access denied to this receipt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: Access denied
+        "404":
+          description: Receipt not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: Receipt not found
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /receipts/{receiptId}/download:
+    get:
+      summary: Download receipt as PDF
+      description: Generate and download a PDF version of the receipt
+      tags:
+        - Receipts
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: receiptId
+          required: true
+          schema:
+            type: string
+          description: MongoDB ObjectId of the receipt
+      responses:
+        "200":
+          description: PDF file generated and returned
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: Attachment filename
+              example: attachment; filename="receipt-RCP-2024-001234.pdf"
+        "403":
+          description: Access denied to this receipt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: Access denied
+        "404":
+          description: Receipt not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: string
+                    example: Receipt not found
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ReceiptSummary:
+      type: object
+      properties:
+        receiptId:
+          type: string
+          example: 507f1f77bcf86cd799439011
+        receiptNumber:
+          type: string
+          example: RCP-2024-001234
+        receiptType:
+          type: string
+          enum:
+            - payment
+            - earnings
+          example: payment
+        taskTitle:
+          type: string
+          example: Clean my apartment
+        taskCategory:
+          type: string
+          example: Cleaning
+        amount:
+          type: number
+          example: 150.00
+          description: Amount paid (for payment receipts) or received (for earnings receipts)
+        currency:
+          type: string
+          example: USD
+        serviceFee:
+          type: number
+          example: 15.00
+        taxAmount:
+          type: number
+          example: 2.50
+        taxType:
+          type: string
+          example: GST
+        dateGenerated:
+          type: string
+          format: date-time
+          example: 2024-10-28T10:30:00Z
+        dateCompleted:
+          type: string
+          format: date-time
+          example: 2024-10-28T09:00:00Z
+        downloadCount:
+          type: integer
+          example: 3
+        lastDownloaded:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          enum:
+            - generated
+            - downloaded
+            - archived
+          example: generated
+        isMyPayment:
+          type: boolean
+          description: True if current user paid for the task
+          example: true
+        isMyEarning:
+          type: boolean
+          description: True if current user earned from the task
+          example: false
+        canDownload:
+          type: boolean
+          example: true
+
+    ReceiptDetails:
+      type: object
+      properties:
+        receiptId:
+          type: string
+          example: 507f1f77bcf86cd799439011
+        receiptNumber:
+          type: string
+          example: RCP-2024-001234
+        receiptType:
+          type: string
+          enum:
+            - payment
+            - earnings
+        task:
+          type: object
+          properties:
+            id:
+              type: string
+            title:
+              type: string
+            category:
+              type: string
+            location:
+              type: string
+            description:
+              type: string
+            dateCompleted:
+              type: string
+              format: date-time
+            status:
+              type: string
+        financial:
+          type: object
+          properties:
+            offerAmount:
+              type: number
+              example: 150.00
+            serviceFee:
+              type: number
+              example: 15.00
+            totalPaid:
+              type: number
+              example: 165.00
+            amountReceived:
+              type: number
+              example: 150.00
+            currency:
+              type: string
+              example: USD
+            tax:
+              type: object
+              properties:
+                type:
+                  type: string
+                  example: GST
+                rate:
+                  type: number
+                  example: 0.10
+                amount:
+                  type: number
+                  example: 1.50
+                includedInServiceFee:
+                  type: boolean
+                  example: true
+            stripe:
+              type: object
+              properties:
+                paymentIntentId:
+                  type: string
+                transactionFee:
+                  type: number
+                  example: 5.00
+        people:
+          type: object
+          properties:
+            poster:
+              type: object
+              properties:
+                id:
+                  type: string
+                name:
+                  type: string
+                email:
+                  type: string
+            tasker:
+              type: object
+              properties:
+                id:
+                  type: string
+                name:
+                  type: string
+                email:
+                  type: string
+        platform:
+          type: object
+          properties:
+            name:
+              type: string
+              example: MyToDoo
+            version:
+              type: string
+            supportEmail:
+              type: string
+        metadata:
+          type: object
+          properties:
+            dateGenerated:
+              type: string
+              format: date-time
+            downloadCount:
+              type: integer
+            lastDownloaded:
+              type: string
+              format: date-time
+              nullable: true
+            status:
+              type: string
+        userRelation:
+          type: object
+          properties:
+            isMyPayment:
+              type: boolean
+            isMyEarning:
+              type: boolean
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 10
+        total:
+          type: integer
+          example: 45
+        pages:
+          type: integer
+          example: 5
+
+  responses:
+    UnauthorizedError:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: string
+                example: Unauthorized
+
+    ServerError:
+      description: Server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: string
+                example: Failed to fetch receipts
+              message:
+                type: string
+                example: Internal server error

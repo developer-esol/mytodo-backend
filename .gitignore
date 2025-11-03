@@ -1,9 +1,64 @@
 node_modules/
+jspm_packages/
+package-lock.json
+npm-shrinkwrap.json
+yarn.lock
+pnpm-lock.yaml
+package-lock.json
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Build output
 dist/
 build/
+tmp/
+temp/
+out/
+lib/
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+.svelte-kit/
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+typings/
+
+# Testing & coverage
+coverage/
+.nyc_output/
+
+# Uploaded/generated assets
+uploads/
+
+# IDE & editor metadata
 .idea/
 .vscode/
+.history/
+*.swp
+*.swo
+*.iml
+
+# OS metadata
 .DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 
 # Security - Sensitive files
 serviceAccountKey.json
@@ -11,8 +66,7 @@ serviceAccountKey.json
 *.p12
 *.key
 .env
-.env.local
-.env.production
+.env.*
 config/secrets.js
 
 # AWS credentials
@@ -30,3 +84,4 @@ firebase-adminsdk-*.json
 secrets/
 credentials/
 *.secret
+*.secrets

@@ -1,0 +1,450 @@
+openapi: 3.0.0
+info:
+  title: User Review API
+  description: API endpoints for user reviews, ratings, and review requests
+  version: 1.0.0
+
+paths:
+  /users/{userId}/rating-stats:
+    get:
+      tags:
+        - User Reviews
+      summary: Get user rating statistics
+      description: Retrieve comprehensive rating statistics for a specific user
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: User ID (MongoDB ObjectId)
+      responses:
+        200:
+          description: Rating statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      userId:
+                        type: string
+                      averageRating:
+                        type: number
+                        format: float
+                        description: Average rating (1-5)
+                      totalReviews:
+                        type: integer
+                        description: Total number of reviews
+                      ratingDistribution:
+                        type: object
+                        properties:
+                          5:
+                            type: integer
+                          4:
+                            type: integer
+                          3:
+                            type: integer
+                          2:
+                            type: integer
+                          1:
+                            type: integer
+                      asPoster:
+                        type: object
+                        description: Ratings received as task poster
+                        properties:
+                          averageRating:
+                            type: number
+                          totalReviews:
+                            type: integer
+                      asTasker:
+                        type: object
+                        description: Ratings received as tasker
+                        properties:
+                          averageRating:
+                            type: number
+                          totalReviews:
+                            type: integer
+        404:
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /users/{userId}/reviews:
+    get:
+      tags:
+        - User Reviews
+      summary: Get user reviews (paginated)
+      description: Retrieve paginated reviews for a specific user with optional filtering
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: User ID (MongoDB ObjectId)
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Page number for pagination
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+          description: Number of reviews per page
+        - in: query
+          name: role
+          schema:
+            type: string
+            enum: [poster, tasker]
+          description: Filter reviews by user role (poster = reviews received as task poster, tasker = reviews received as tasker)
+        - in: query
+          name: populate
+          schema:
+            type: string
+            enum: [reviewer, task]
+          description: Populate additional data (reviewer = reviewer details, task = task details)
+      responses:
+        200:
+          description: Reviews retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserReview"
+                  pagination:
+                    type: object
+                    properties:
+                      currentPage:
+                        type: integer
+                      totalPages:
+                        type: integer
+                      totalReviews:
+                        type: integer
+                      hasMore:
+                        type: boolean
+        404:
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      tags:
+        - User Reviews
+      summary: Submit a review for a user
+      description: Submit a rating and review for a user based on task completion
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: User ID to review (MongoDB ObjectId)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - rating
+                - reviewText
+              properties:
+                rating:
+                  type: number
+                  minimum: 1
+                  maximum: 5
+                  description: Rating from 1 to 5 stars
+                reviewText:
+                  type: string
+                  minLength: 10
+                  maxLength: 500
+                  description: Review text (10-500 characters)
+                taskId:
+                  type: string
+                  pattern: "^[0-9a-fA-F]{24}$"
+                  description: Optional task ID related to this review
+      responses:
+        201:
+          description: Review submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Review submitted successfully
+                  data:
+                    $ref: "#/components/schemas/UserReview"
+        400:
+          description: Invalid request or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        401:
+          description: Unauthorized - authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        403:
+          description: Forbidden - cannot review yourself or duplicate review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        404:
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /users/{userId}/can-review:
+    get:
+      tags:
+        - User Reviews
+      summary: Check if current user can review another user
+      description: Verify if the authenticated user is eligible to review the specified user
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: User ID to check (MongoDB ObjectId)
+      responses:
+        200:
+          description: Review eligibility information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  canReview:
+                    type: boolean
+                    description: Whether the user can submit a review
+                  reason:
+                    type: string
+                    description: Reason why user can or cannot review
+                    example: You can review this user
+                  hasCompletedTasks:
+                    type: boolean
+                    description: Whether users have completed tasks together
+                  alreadyReviewed:
+                    type: boolean
+                    description: Whether user has already reviewed this person
+        401:
+          description: Unauthorized - authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        404:
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /users/request-review:
+    post:
+      tags:
+        - User Reviews
+      summary: Send review request via email or SMS
+      description: Send a review request to someone via email or SMS
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - method
+                - recipient
+              properties:
+                method:
+                  type: string
+                  enum: [email, sms]
+                  description: Method to send review request
+                recipient:
+                  type: string
+                  description: Email address or phone number
+                  example: user@example.com
+                message:
+                  type: string
+                  maxLength: 500
+                  description: Optional custom message to include in the request
+      responses:
+        200:
+          description: Review request sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Review request sent successfully
+                  sentTo:
+                    type: string
+                    description: Recipient email or phone number
+                  method:
+                    type: string
+                    enum: [email, sms]
+        400:
+          description: Invalid request or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        401:
+          description: Unauthorized - authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        500:
+          description: Server error - failed to send request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication
+
+  schemas:
+    UserReview:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: Review ID
+        reviewedUser:
+          type: string
+          description: ID of the user being reviewed
+        reviewer:
+          type: object
+          properties:
+            _id:
+              type: string
+            firstName:
+              type: string
+            lastName:
+              type: string
+            avatar:
+              type: string
+        rating:
+          type: number
+          minimum: 1
+          maximum: 5
+          description: Rating from 1 to 5 stars
+        reviewText:
+          type: string
+          description: Review content
+        taskId:
+          type: string
+          description: Related task ID (if applicable)
+        task:
+          type: object
+          description: Task details (if populated)
+          properties:
+            _id:
+              type: string
+            title:
+              type: string
+            status:
+              type: string
+        role:
+          type: string
+          enum: [poster, tasker]
+          description: Role of the reviewed user in the task
+        response:
+          type: object
+          description: Response from reviewed user (if any)
+          properties:
+            text:
+              type: string
+            respondedAt:
+              type: string
+              format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          description: Error message
+        message:
+          type: string
+          description: Detailed error message

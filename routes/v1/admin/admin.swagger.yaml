@@ -1,0 +1,701 @@
+openapi: 3.0.0
+info:
+  title: Admin Panel API
+  description: API endpoints for administrative functions including user management, task management, analytics, and system configuration
+  version: 1.0.0
+
+security:
+  - adminAuth: []
+
+paths:
+  /admin/login:
+    post:
+      tags:
+        - Admin Authentication
+      summary: Admin login
+      description: Authenticate admin or superadmin user and receive JWT token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: Admin email address
+                password:
+                  type: string
+                  format: password
+                  description: Admin password
+      responses:
+        200:
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                        description: JWT token (8 hour expiry)
+                      user:
+                        $ref: "#/components/schemas/AdminUser"
+        401:
+          description: Invalid credentials or not an admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /admin/dashboard/stats:
+    get:
+      tags:
+        - Dashboard
+      summary: Get dashboard statistics
+      description: Retrieve comprehensive dashboard stats including users and tasks metrics
+      responses:
+        200:
+          description: Dashboard stats retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      users:
+                        $ref: "#/components/schemas/UserStats"
+                      tasks:
+                        $ref: "#/components/schemas/TaskStats"
+
+  /admin/users:
+    get:
+      tags:
+        - User Management
+      summary: Get users list with pagination
+      description: Retrieve paginated list of users with filtering options
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+          description: Items per page
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search by name or email
+        - in: query
+          name: role
+          schema:
+            type: string
+            enum: [user, poster, tasker, admin, superadmin, all]
+          description: Filter by user role
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [active, inactive, suspended, all]
+          description: Filter by user status
+      responses:
+        200:
+          description: Users list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      users:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/UserDetailed"
+                      pagination:
+                        $ref: "#/components/schemas/Pagination"
+
+  /admin/users/{userId}:
+    get:
+      tags:
+        - User Management
+      summary: Get single user details
+      description: Retrieve detailed information about a specific user
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: User ID (MongoDB ObjectId)
+      responses:
+        200:
+          description: User details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    $ref: "#/components/schemas/UserDetailed"
+        404:
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /admin/tasks:
+    get:
+      tags:
+        - Task Management
+      summary: Get tasks list with pagination
+      description: Retrieve paginated list of tasks with filtering options
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search by title or description
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [open, assigned, in-progress, completed, cancelled]
+        - in: query
+          name: category
+          schema:
+            type: string
+          description: Filter by category
+      responses:
+        200:
+          description: Tasks list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      tasks:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/AdminTask"
+                      pagination:
+                        type: object
+                        properties:
+                          currentPage:
+                            type: integer
+                          totalPages:
+                            type: integer
+                          totalTasks:
+                            type: integer
+                          limit:
+                            type: integer
+
+  /admin/tasks/{id}:
+    get:
+      tags:
+        - Task Management
+      summary: Get single task details
+      description: Retrieve detailed information about a specific task
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Task ID
+      responses:
+        200:
+          description: Task details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      task:
+                        $ref: "#/components/schemas/AdminTask"
+        404:
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /admin/tasks/{id}/status:
+    patch:
+      tags:
+        - Task Management
+      summary: Update task status
+      description: Update the status of a specific task
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Task ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [open, assigned, in-progress, completed, cancelled]
+      responses:
+        200:
+          description: Task status updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      task:
+                        $ref: "#/components/schemas/AdminTask"
+                  message:
+                    type: string
+        400:
+          description: Invalid status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /admin/analytics:
+    get:
+      tags:
+        - Analytics
+      summary: Get analytics data
+      description: Retrieve comprehensive analytics data for specified time range
+      parameters:
+        - in: query
+          name: timeRange
+          schema:
+            type: string
+            enum: [7d, 30d, 90d, 1y]
+            default: 30d
+          description: Time range for analytics
+      responses:
+        200:
+          description: Analytics data retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      userRegistrations:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/TimeSeriesData"
+                      taskCreations:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/TimeSeriesData"
+
+  /admin/commission-settings:
+    get:
+      tags:
+        - Commission Settings
+      summary: Get commission settings
+      description: Retrieve current commission/service fee configuration
+      responses:
+        200:
+          description: Commission settings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    $ref: "#/components/schemas/CommissionSettings"
+
+    put:
+      tags:
+        - Commission Settings
+      summary: Update commission settings
+      description: Update commission/service fee configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                commissionRate:
+                  type: number
+                  description: Commission rate as percentage (e.g., 10 for 10%)
+                  minimum: 0
+                  maximum: 100
+                minimumFee:
+                  type: number
+                  description: Minimum fee in USD
+                  minimum: 0
+                maximumFee:
+                  type: number
+                  description: Maximum fee in USD
+                  minimum: 0
+                currencyRates:
+                  type: object
+                  description: Currency conversion rates
+      responses:
+        200:
+          description: Commission settings updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/CommissionSettings"
+
+  /admin/metadata:
+    get:
+      tags:
+        - Metadata
+      summary: Get metadata for dropdowns
+      description: Retrieve available roles and statuses for UI dropdowns (public endpoint)
+      security: []
+      responses:
+        200:
+          description: Metadata retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      roles:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            value:
+                              type: string
+                            label:
+                              type: string
+                      statuses:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            value:
+                              type: string
+                            label:
+                              type: string
+
+  /admin/test:
+    get:
+      tags:
+        - Health Check
+      summary: Test admin routes
+      description: Simple health check endpoint
+      security: []
+      responses:
+        200:
+          description: Admin routes are working
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+
+components:
+  securitySchemes:
+    adminAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Admin JWT token obtained from login
+
+  schemas:
+    AdminUser:
+      type: object
+      properties:
+        _id:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin, superadmin]
+
+    UserDetailed:
+      type: object
+      properties:
+        _id:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+        status:
+          type: string
+        avatar:
+          type: string
+        location:
+          type: object
+        bio:
+          type: string
+        skills:
+          type: object
+        completedTasks:
+          type: integer
+        isVerified:
+          type: boolean
+        isEmailVerified:
+          type: boolean
+        isPhoneVerified:
+          type: boolean
+        rating:
+          type: number
+        ratingStats:
+          type: object
+          properties:
+            overall:
+              type: object
+              properties:
+                average:
+                  type: number
+                count:
+                  type: integer
+                distribution:
+                  type: object
+            asPoster:
+              type: object
+              properties:
+                average:
+                  type: number
+                count:
+                  type: integer
+            asTasker:
+              type: object
+              properties:
+                average:
+                  type: number
+                count:
+                  type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AdminTask:
+      type: object
+      properties:
+        _id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        categories:
+          type: array
+          items:
+            type: string
+        budget:
+          type: number
+        currency:
+          type: string
+        createdBy:
+          type: object
+          properties:
+            firstName:
+              type: string
+            lastName:
+              type: string
+            email:
+              type: string
+        assignedTo:
+          type: object
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    UserStats:
+      type: object
+      properties:
+        total:
+          type: integer
+        active:
+          type: integer
+        newThisMonth:
+          type: integer
+        newThisWeek:
+          type: integer
+
+    TaskStats:
+      type: object
+      properties:
+        total:
+          type: integer
+        completed:
+          type: integer
+        open:
+          type: integer
+        newThisMonth:
+          type: integer
+        newThisWeek:
+          type: integer
+
+    Pagination:
+      type: object
+      properties:
+        currentPage:
+          type: integer
+        totalPages:
+          type: integer
+        totalUsers:
+          type: integer
+        limit:
+          type: integer
+
+    CommissionSettings:
+      type: object
+      properties:
+        id:
+          type: integer
+        commissionRate:
+          type: number
+        minimumFee:
+          type: number
+        maximumFee:
+          type: number
+        currency:
+          type: string
+        isActive:
+          type: boolean
+        appliesTo:
+          type: string
+        description:
+          type: string
+        supportedCurrencies:
+          type: array
+          items:
+            type: string
+        currencyRates:
+          type: object
+        lastUpdated:
+          type: string
+          format: date-time
+
+    TimeSeriesData:
+      type: object
+      properties:
+        _id:
+          type: object
+          properties:
+            year:
+              type: integer
+            month:
+              type: integer
+            day:
+              type: integer
+        count:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+        message:
+          type: string
