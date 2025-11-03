@@ -1,5 +1,6 @@
 const swaggerJsDoc = require("swagger-jsdoc");
 const swaggerUi = require("swagger-ui-express");
+const logger = require("./config/logger");
 
 const options = {
   definition: {
@@ -11,7 +12,22 @@ const options = {
     },
     servers: [
       {
+        url:
+          process.env.NODE_ENV === "production"
+            ? `http://134.199.172.167:5001/api`
+            : `http://localhost:5001/api`,
+        description:
+          process.env.NODE_ENV === "production"
+            ? "Production server"
+            : "Development server",
+      },
+      {
         url: `http://localhost:5001/api`,
+        description: "Local development server",
+      },
+      {
+        url: `http://134.199.172.167:5001/api`,
+        description: "Production server (HTTP)",
       },
     ],
   },
@@ -35,8 +51,42 @@ const options = {
 const swaggerSpec = swaggerJsDoc(options);
 
 function swaggerDocs(app, port) {
-  app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-  console.log(`Swagger Docs running at http://localhost:${port}/api-docs`);
+  // Swagger UI configuration
+  const swaggerOptions = {
+    explorer: true,
+    swaggerOptions: {
+      urls: [
+        {
+          url: `http://134.199.172.167:5001/api-docs/swagger.json`,
+          name: "Production Server (HTTP)",
+        },
+        {
+          url: `http://localhost:5001/api-docs/swagger.json`,
+          name: "Local Server",
+        },
+      ],
+    },
+  };
+
+  app.use("/api-docs", swaggerUi.serve);
+  app.get("/api-docs", swaggerUi.setup(swaggerSpec, swaggerOptions));
+
+  // Serve swagger spec as JSON
+  app.get("/api-docs/swagger.json", (req, res) => {
+    res.setHeader("Content-Type", "application/json");
+    res.send(swaggerSpec);
+  });
+
+  const serverUrl =
+    process.env.NODE_ENV === "production"
+      ? `http://134.199.172.167:${port}/api-docs`
+      : `http://localhost:${port}/api-docs`;
+
+  logger.info("Swagger Docs initialized", {
+    file: "swagger.js",
+    url: serverUrl,
+    environment: process.env.NODE_ENV || "development",
+  });
 }
 
 module.exports = swaggerDocs;
