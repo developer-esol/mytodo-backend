@@ -1,14 +1,20 @@
 // task controller.js
 const mongoose = require("mongoose");
-const Chat = require("../models/Chat");
-const Task = require("../models/Task");
-const Offer = require("../models/Offer");
-const User = require("../models/User");
-const Question = require("../models/Question");
-const Transaction = require("../models/TransActions");
-const Payment = require("../models/Payment");
-const { formatUserObject, formatCurrency, formatCurrencyObject } = require('../utils/userUtils');
-const { generateReceiptsForCompletedTask } = require('../services/receiptService');
+const Chat = require("../models/chat/Chat");
+const Task = require("../models/task/Task");
+const Offer = require("../models/task/Offer");
+const User = require("../models/user/User");
+const Question = require("../models/task/Question");
+const Transaction = require("../models/payment/TransActions");
+const Payment = require("../models/payment/Payment");
+const {
+  formatUserObject,
+  formatCurrency,
+  formatCurrencyObject,
+} = require("../utils/userUtils");
+const {
+  generateReceiptsForCompletedTask,
+} = require("../services/receiptService");
 const notificationService = require("../services/notificationService");
 
 // @desc    Create an offer for a task
@@ -17,17 +23,17 @@ const notificationService = require("../services/notificationService");
 
 exports.updateTaskStatus = async (req, res) => {
   try {
-    const {taskId} = req.params;
-    const {newStatus} = req.body;
+    const { taskId } = req.params;
+    const { newStatus } = req.body;
     const userId = req.user._id;
 
     if (!mongoose.Types.ObjectId.isValid(taskId)) {
-      return res.status(400).json({success: false, error: "Invalid task ID"});
+      return res.status(400).json({ success: false, error: "Invalid task ID" });
     }
 
     const task = await Task.findById(taskId);
     if (!task) {
-      return res.status(404).json({success: false, error: "Task not found"});
+      return res.status(404).json({ success: false, error: "Task not found" });
     }
 
     // Enhanced status transition validation
@@ -69,18 +75,21 @@ exports.updateTaskStatus = async (req, res) => {
           });
         }
         task.doneAt = new Date();
-        
+
         // Send notification to poster and tasker about task completion
         try {
           const [tasker, poster] = await Promise.all([
             User.findById(task.assignedTo),
-            User.findById(task.createdBy)
+            User.findById(task.createdBy),
           ]);
-          
+
           await notificationService.notifyTaskCompleted(task, tasker, poster);
           console.log("Task completion notifications sent successfully");
         } catch (notificationError) {
-          console.error("Error sending task completion notifications:", notificationError);
+          console.error(
+            "Error sending task completion notifications:",
+            notificationError
+          );
           // Don't fail the request if notification fails
         }
         break;
@@ -96,53 +105,77 @@ exports.updateTaskStatus = async (req, res) => {
 
         // CRITICAL: Update payment status FIRST before generating receipts
         // This ensures payment is marked "completed" before receipt generation tries to find it
-        console.log(`💳 Updating payment status to completed for task ${taskId}...`);
+        console.log(
+          `💳 Updating payment status to completed for task ${taskId}...`
+        );
         await Payment.updateMany(
-          {task: taskId}, 
-          {$set: {status: "completed", updatedAt: new Date()}}
+          { task: taskId },
+          { $set: { status: "completed", updatedAt: new Date() } }
         );
         console.log(`✅ Payment status updated to completed`);
 
         // Update related offer and transaction (can run in parallel)
         await Promise.all([
           Offer.findOneAndUpdate(
-            {taskId, status: "accepted"},
-            {status: "completed", completedAt: new Date()}
+            { taskId, status: "accepted" },
+            { status: "completed", completedAt: new Date() }
           ),
-          Transaction.updateMany({taskId}, {$set: {taskStatus: "completed"}}),
+          Transaction.updateMany(
+            { taskId },
+            { $set: { taskStatus: "completed" } }
+          ),
         ]);
 
         // Generate receipts for both poster and tasker when task is completed
         try {
-          console.log(`🔄 Attempting to generate receipts for completed task ${taskId}...`);
+          console.log(
+            `🔄 Attempting to generate receipts for completed task ${taskId}...`
+          );
           const receipts = await generateReceiptsForCompletedTask(taskId);
-          console.log(`✅ Receipts successfully generated for task ${taskId}:`, {
-            paymentReceipt: receipts.paymentReceipt.receiptNumber,
-            earningsReceipt: receipts.earningsReceipt.receiptNumber
-          });
-          
+          console.log(
+            `✅ Receipts successfully generated for task ${taskId}:`,
+            {
+              paymentReceipt: receipts.paymentReceipt.receiptNumber,
+              earningsReceipt: receipts.earningsReceipt.receiptNumber,
+            }
+          );
+
           // Send receipt ready notifications
           if (receipts.paymentReceipt) {
             try {
               const poster = await User.findById(task.createdBy);
-              await notificationService.notifyReceiptReady(receipts.paymentReceipt, task, poster);
+              await notificationService.notifyReceiptReady(
+                receipts.paymentReceipt,
+                task,
+                poster
+              );
             } catch (notifError) {
-              console.error("Error sending poster receipt notification:", notifError);
+              console.error(
+                "Error sending poster receipt notification:",
+                notifError
+              );
             }
           }
-          
+
           if (receipts.earningsReceipt) {
             try {
               const tasker = await User.findById(task.assignedTo);
-              await notificationService.notifyReceiptReady(receipts.earningsReceipt, task, tasker);
+              await notificationService.notifyReceiptReady(
+                receipts.earningsReceipt,
+                task,
+                tasker
+              );
             } catch (notifError) {
-              console.error("Error sending tasker receipt notification:", notifError);
+              console.error(
+                "Error sending tasker receipt notification:",
+                notifError
+              );
             }
           }
         } catch (receiptError) {
           console.error(`❌ Failed to generate receipts for task ${taskId}:`, {
             error: receiptError.message,
-            stack: receiptError.stack
+            stack: receiptError.stack,
           });
           // Don't fail the task completion if receipt generation fails
           // Receipts can be generated later via the API
@@ -173,10 +206,13 @@ exports.updateTaskStatus = async (req, res) => {
     // Sync with transaction table (corrected case sensitivity)
     if (newStatus !== "completed") {
       // Already handled above for completed
-      await Transaction.updateMany({taskId}, {$set: {taskStatus: newStatus}});
+      await Transaction.updateMany(
+        { taskId },
+        { $set: { taskStatus: newStatus } }
+      );
     }
 
-    res.status(200).json({success: true, data: task});
+    res.status(200).json({ success: true, data: task });
   } catch (error) {
     console.error("Error updating task status:", error);
     res.status(500).json({
@@ -194,7 +230,7 @@ exports.createTaskOffer = async (req, res) => {
       user: req.user,
     });
 
-    const {amount, message} = req.body;
+    const { amount, message } = req.body;
     const taskId = req.params.id;
     const taskTakerId = req.user._id; // From authenticated user
 
@@ -262,7 +298,7 @@ exports.createTaskOffer = async (req, res) => {
 
     // Ensure we have a valid currency from the task
     const offerCurrency = task.currency || "USD";
-    
+
     // Create new offer with the updated schema
     const newOffer = new Offer({
       taskId: taskId,
@@ -365,19 +401,20 @@ exports.createTask = async (req, res) => {
     } = req.body;
 
     // Handle empty time field - default to "Anytime"
-    const time = rawTime && rawTime.trim() !== '' ? rawTime : 'Anytime';
+    const time = rawTime && rawTime.trim() !== "" ? rawTime : "Anytime";
 
     // Detect if request is from mobile app
-    const userAgent = req.headers['user-agent'] || '';
-    const isMobileApp = userAgent.includes('MyToDoo-Mobile') || 
-                       userAgent.includes('Expo') || 
-                       req.headers['x-platform'] === 'mobile';
+    const userAgent = req.headers["user-agent"] || "";
+    const isMobileApp =
+      userAgent.includes("MyToDoo-Mobile") ||
+      userAgent.includes("Expo") ||
+      req.headers["x-platform"] === "mobile";
 
     console.log("Request platform detection:", {
       userAgent,
       isMobileApp,
       isMovingTask,
-      xPlatform: req.headers['x-platform']
+      xPlatform: req.headers["x-platform"],
     });
 
     // Validate dateType is one of the expected values
@@ -390,7 +427,7 @@ exports.createTask = async (req, res) => {
 
     // Default locationType to "In-person" for backward compatibility
     const effectiveLocationType = locationType || "In-person";
-    
+
     // Validate locationType if provided
     if (locationType && !["In-person", "Online"].includes(locationType)) {
       return res.status(400).json({
@@ -401,16 +438,19 @@ exports.createTask = async (req, res) => {
 
     // Validate required fields with more specific messages
     const missingFields = [];
-    if (!title || title.trim() === '') missingFields.push("title");
-    if (!category || category.trim() === '') missingFields.push("category");
+    if (!title || title.trim() === "") missingFields.push("title");
+    if (!category || category.trim() === "") missingFields.push("category");
     // time now defaults to "Anytime" if empty
-    
+
     // Location is required only for In-person tasks
-    if (effectiveLocationType === "In-person" && (!location || location.trim() === '')) {
+    if (
+      effectiveLocationType === "In-person" &&
+      (!location || location.trim() === "")
+    ) {
       missingFields.push("location (required for In-person tasks)");
     }
-    
-    if (!details || details.trim() === '') missingFields.push("details");
+
+    if (!details || details.trim() === "") missingFields.push("details");
     if (!budget || isNaN(Number(budget))) missingFields.push("budget");
 
     // Validate moving-specific fields for mobile moving tasks
@@ -419,7 +459,7 @@ exports.createTask = async (req, res) => {
         pickupLocation,
         pickupPostalCode,
         dropoffLocation,
-        dropoffPostalCode
+        dropoffPostalCode,
       });
 
       if (!pickupLocation) missingFields.push("pickupLocation");
@@ -488,9 +528,12 @@ exports.createTask = async (req, res) => {
 
     // Create location object conditionally
     const locationObj = {
-      address: effectiveLocationType === "Online" 
-        ? "Remote" 
-        : (Array.isArray(location) ? location[0] : location),
+      address:
+        effectiveLocationType === "Online"
+          ? "Remote"
+          : Array.isArray(location)
+          ? location[0]
+          : location,
     };
 
     // Only add coordinates if they exist and it's an In-person task
@@ -498,10 +541,7 @@ exports.createTask = async (req, res) => {
     if (coordinates && effectiveLocationType === "In-person") {
       locationObj.coordinates = {
         type: "Point",
-        coordinates: [
-          coordinates.lng || coordinates.lon,
-          coordinates.lat,
-        ],
+        coordinates: [coordinates.lng || coordinates.lon, coordinates.lat],
       };
     }
     // For Online tasks, don't add coordinates at all (not even undefined)
@@ -511,8 +551,8 @@ exports.createTask = async (req, res) => {
       title,
       categories: Array.isArray(category)
         ? category.map((c) => c.trim())
-        : category.includes(',')
-        ? category.split(',').map((c) => c.trim())
+        : category.includes(",")
+        ? category.split(",").map((c) => c.trim())
         : [category.trim()],
       locationType: effectiveLocationType, // Use the effective location type
       date: endDate,
@@ -537,12 +577,12 @@ exports.createTask = async (req, res) => {
       taskData.movingDetails = {
         pickupLocation: {
           address: pickupLocation,
-          postalCode: pickupPostalCode
+          postalCode: pickupPostalCode,
         },
         dropoffLocation: {
           address: dropoffLocation,
-          postalCode: dropoffPostalCode
-        }
+          postalCode: dropoffPostalCode,
+        },
       };
 
       console.log("Adding moving details to task:", taskData.movingDetails);
@@ -565,7 +605,10 @@ exports.createTask = async (req, res) => {
       );
       console.log("Task creation notification sent successfully");
     } catch (notificationError) {
-      console.error("Error sending task creation notification:", notificationError);
+      console.error(
+        "Error sending task creation notification:",
+        notificationError
+      );
       // Don't fail the request if notification fails
     }
 
@@ -607,7 +650,7 @@ exports.getTasks = async (req, res) => {
 
     // Category filter
     if (category) {
-      query.category = {$regex: category, $options: "i"};
+      query.category = { $regex: category, $options: "i" };
     }
 
     // Status filter
@@ -627,9 +670,9 @@ exports.getTasks = async (req, res) => {
     // Search in title or details
     if (search) {
       query.$or = [
-        {title: {$regex: search, $options: "i"}},
-        {details: {$regex: search, $options: "i"}},
-        {"location.address": {$regex: search, $options: "i"}},
+        { title: { $regex: search, $options: "i" } },
+        { details: { $regex: search, $options: "i" } },
+        { "location.address": { $regex: search, $options: "i" } },
       ];
     }
 
@@ -673,13 +716,13 @@ exports.getTasks = async (req, res) => {
     const offerCounts = await Offer.aggregate([
       {
         $match: {
-          taskId: {$in: taskIds},
+          taskId: { $in: taskIds },
         },
       },
       {
         $group: {
           _id: "$taskId",
-          count: {$sum: 1},
+          count: { $sum: 1 },
         },
       },
     ]);
@@ -720,7 +763,7 @@ exports.getTasks = async (req, res) => {
 // @access  Private
 exports.getMyTasks = async (req, res) => {
   try {
-    const {status, role, subSection} = req.query;
+    const { status, role, subSection } = req.query;
     const userId = req.user._id;
 
     // Build base query
@@ -883,7 +926,7 @@ exports.updateTask = async (req, res) => {
   try {
     const taskId = req.params.id;
     const updates = req.body;
-    console.log("Update task request:", {taskId, updates});
+    console.log("Update task request:", { taskId, updates });
 
     const task = await Task.findById(taskId);
     if (!task) {
@@ -904,7 +947,7 @@ exports.updateTask = async (req, res) => {
     // Handle date updates based on dateType
     let dateRange = task.dateRange; // Default to existing dateRange
     let dateType = updates.dateType || task.dateType; // Use provided or existing dateType
-    
+
     // Only recalculate dateRange if dateType or date is being updated
     if (updates.dateType || updates.date) {
       switch (dateType) {
@@ -956,18 +999,21 @@ exports.updateTask = async (req, res) => {
 
     // Conditionally add fields if they are provided
     if (updates.title !== undefined) updateData.title = updates.title;
-    if (updates.description !== undefined) updateData.description = updates.description;
+    if (updates.description !== undefined)
+      updateData.description = updates.description;
     if (updates.budget !== undefined) updateData.budget = updates.budget;
     if (updates.currency !== undefined) updateData.currency = updates.currency;
     if (updates.time !== undefined) updateData.time = updates.time;
     if (dateRange.end) updateData.date = dateRange.end;
-    
+
     // Handle location updates
     if (updates.location?.address || updates.location) {
-      updateData["location.address"] = updates.location?.address || updates.location;
+      updateData["location.address"] =
+        updates.location?.address || updates.location;
     }
     if (updates.location?.coordinates || updates.coordinates) {
-      updateData["location.coordinates"] = updates.location?.coordinates || updates.coordinates;
+      updateData["location.coordinates"] =
+        updates.location?.coordinates || updates.coordinates;
     }
 
     console.log("Update data to be applied:", updateData);
@@ -975,10 +1021,9 @@ exports.updateTask = async (req, res) => {
     // Update task
     const updatedTask = await Task.findByIdAndUpdate(
       taskId,
-      {$set: updateData},
-      {new: true, runValidators: true}
-    )
-      .populate("createdBy", "name avatar rating");
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).populate("createdBy", "name avatar rating");
 
     console.log("Task updated successfully:", {
       taskId: updatedTask._id,
@@ -1007,10 +1052,10 @@ exports.deleteTask = async (req, res) => {
     const taskId = req.params.id;
     const userId = req.user._id;
 
-    console.log("Delete task request:", {taskId, userId});
+    console.log("Delete task request:", { taskId, userId });
 
     // Validate ObjectId format
-    if (!require('mongoose').Types.ObjectId.isValid(taskId)) {
+    if (!require("mongoose").Types.ObjectId.isValid(taskId)) {
       return res.status(400).json({
         success: false,
         error: "Invalid task ID format",
@@ -1031,7 +1076,7 @@ exports.deleteTask = async (req, res) => {
     if (taskExists.createdBy.toString() !== userId.toString()) {
       console.log("Unauthorized delete attempt:", {
         taskCreator: taskExists.createdBy.toString(),
-        requestingUser: userId.toString()
+        requestingUser: userId.toString(),
       });
       return res.status(403).json({
         success: false,
@@ -1065,7 +1110,7 @@ exports.deleteTask = async (req, res) => {
 
     // Delete associated offers first
     console.log("Deleting offers for taskId:", taskId);
-    const offerDeleteResult = await Offer.deleteMany({taskId: taskId});
+    const offerDeleteResult = await Offer.deleteMany({ taskId: taskId });
     console.log("Deleted offers:", offerDeleteResult.deletedCount);
 
     // Delete the task
@@ -1124,14 +1169,14 @@ exports.getTaskWithOffers = async (req, res) => {
     // Get all offers with populated user details - remove uniqueness filtering
     const offers = await Offer.find({
       taskId: req.params.id,
-      status: {$ne: "withdrawn"}, // Only exclude withdrawn offers
+      status: { $ne: "withdrawn" }, // Only exclude withdrawn offers
     })
       .populate({
         path: "taskTakerId",
         select: "firstName lastName avatar rating completedTasks name",
         model: "User",
       })
-      .sort({createdAt: -1}) // Sort by newest first
+      .sort({ createdAt: -1 }) // Sort by newest first
       .lean();
 
     // Format all offers without filtering for uniqueness
@@ -1143,7 +1188,7 @@ exports.getTaskWithOffers = async (req, res) => {
         currency: offer.offer.currency,
         taskCurrency: task.currency,
       });
-      
+
       return {
         _id: offer._id,
         user: offer.taskTakerId
@@ -1160,8 +1205,14 @@ exports.getTaskWithOffers = async (req, res) => {
           : null,
         amount: offer.offer.amount,
         currency: offer.offer.currency,
-        formattedAmount: formatCurrency(offer.offer.amount, offer.offer.currency),
-        currencyInfo: formatCurrencyObject(offer.offer.amount, offer.offer.currency),
+        formattedAmount: formatCurrency(
+          offer.offer.amount,
+          offer.offer.currency
+        ),
+        currencyInfo: formatCurrencyObject(
+          offer.offer.amount,
+          offer.offer.currency
+        ),
         message: offer.offer.message,
         status: offer.status,
         createdAt: offer.createdAt,
@@ -1329,10 +1380,10 @@ exports.getTaskWithOffers = async (req, res) => {
 // @access  Private (task owner)
 exports.acceptTaskOffer = async (req, res) => {
   try {
-    const {taskId, offerId} = req.params;
+    const { taskId, offerId } = req.params;
     const userId = req.user._id;
 
-    console.log("Accepting offer:", {taskId, offerId, userId});
+    console.log("Accepting offer:", { taskId, offerId, userId });
 
     // First fetch the task and offer
     const task = await Task.findById(taskId);
@@ -1368,22 +1419,22 @@ exports.acceptTaskOffer = async (req, res) => {
       // Update task
       task.status = "assigned";
       task.assignedTo = offer.taskTakerId;
-      await task.save({session});
+      await task.save({ session });
 
       // Update the accepted offer
       offer.status = "accepted";
-      await offer.save({session});
+      await offer.save({ session });
 
       // Reject all other offers for this task
       await Offer.updateMany(
         {
           taskId: taskId,
-          _id: {$ne: offerId},
+          _id: { $ne: offerId },
         },
         {
-          $set: {status: "rejected"},
+          $set: { status: "rejected" },
         },
-        {session}
+        { session }
       );
 
       await session.commitTransaction();
@@ -1417,7 +1468,10 @@ exports.acceptTaskOffer = async (req, res) => {
 
         console.log("Offer acceptance notifications sent successfully");
       } catch (notificationError) {
-        console.error("Error sending offer acceptance notifications:", notificationError);
+        console.error(
+          "Error sending offer acceptance notifications:",
+          notificationError
+        );
         // Don't fail the request if notification fails
       }
 
@@ -1449,7 +1503,7 @@ exports.acceptTaskOffer = async (req, res) => {
 // @access  Private
 exports.acceptTask = async (req, res) => {
   try {
-    const {message} = req.body;
+    const { message } = req.body;
     const taskId = req.params.id;
     const userId = req.user._id;
 
@@ -1522,7 +1576,7 @@ exports.acceptTask = async (req, res) => {
 // @access  Private
 exports.getMyTasks = async (req, res) => {
   try {
-    const {status, role, subSection} = req.query;
+    const { status, role, subSection } = req.query;
     const userId = req.user._id;
 
     // Build base query
@@ -1598,7 +1652,7 @@ exports.getMyTasks = async (req, res) => {
 exports.getMyOffers = async (req, res) => {
   try {
     // Query offers directly from Offer model
-    const Offer = require("../models/Offer");
+    const Offer = require("../models/task/Offer");
     const offers = await Offer.find({
       taskTakerId: req.user._id,
     })
@@ -1641,8 +1695,8 @@ exports.getMyOffers = async (req, res) => {
 // @access  Private
 exports.completeTaskPayment = async (req, res) => {
   try {
-    const {taskId} = req.params;
-    const {paymentIntentId, offerId} = req.body;
+    const { taskId } = req.params;
+    const { paymentIntentId, offerId } = req.body;
     const userId = req.user._id;
 
     // Verify payment with Stripe
@@ -1686,7 +1740,7 @@ exports.completeTaskPayment = async (req, res) => {
           "offers.$.status": "paid",
         },
       },
-      {new: true}
+      { new: true }
     ).populate("createdBy assignedTo", "name avatar");
 
     if (!task) {
@@ -1716,7 +1770,7 @@ exports.getTasksWithPaymentStatus = async (req, res) => {
   try {
     const tasks = await Task.find({
       createdBy: req.user._id,
-      "payment.status": {$exists: true},
+      "payment.status": { $exists: true },
     }).populate("assignedTo", "name avatar");
 
     res.json({
@@ -1747,7 +1801,7 @@ exports.searchTasks = async (req, res) => {
       sort = "recommended",
     } = req.query;
 
-    console.log("Search params received:", {categories, filters});
+    console.log("Search params received:", { categories, filters });
 
     // Remove hardcoded status filter to allow all task statuses in search results
     const query = {};
@@ -1766,7 +1820,7 @@ exports.searchTasks = async (req, res) => {
             query.isRemote = false;
             break;
           case "With photos only":
-            query.images = {$exists: true, $ne: []};
+            query.images = { $exists: true, $ne: [] };
             break;
           case "Urgent tasks only":
             query.isUrgent = true;
@@ -1789,7 +1843,7 @@ exports.searchTasks = async (req, res) => {
 
       if (categoryArray.length > 0) {
         query.$and = categoryArray.map((category) => ({
-          categories: {$regex: new RegExp(`\\b${category.trim()}\\b`, "i")},
+          categories: { $regex: new RegExp(`\\b${category.trim()}\\b`, "i") },
         }));
       }
     }
@@ -1811,7 +1865,7 @@ exports.searchTasks = async (req, res) => {
             // Handle 500+ case - only set minimum, no maximum
             const minValue = parseFloat(maxPrice.replace("+", ""));
             if (!isNaN(minValue)) {
-              query.budget = {$gte: minValue};
+              query.budget = { $gte: minValue };
             }
           } else {
             const max = parseFloat(maxPrice);
@@ -1833,15 +1887,15 @@ exports.searchTasks = async (req, res) => {
       if (location.toLowerCase() === "remote") {
         query.isRemote = true;
       } else {
-        query["location.address"] = {$regex: location, $options: "i"};
+        query["location.address"] = { $regex: location, $options: "i" };
       }
     }
 
     // Search handling
     if (search && search !== "undefined") {
       query.$or = [
-        {title: {$regex: search, $options: "i"}},
-        {details: {$regex: search, $options: "i"}},
+        { title: { $regex: search, $options: "i" } },
+        { details: { $regex: search, $options: "i" } },
       ];
     }
 
@@ -1849,7 +1903,7 @@ exports.searchTasks = async (req, res) => {
 
     // Rest of your existing aggregation pipeline
     const tasks = await Task.aggregate([
-      {$match: query},
+      { $match: query },
       {
         $lookup: {
           from: "users",
@@ -1868,17 +1922,17 @@ exports.searchTasks = async (req, res) => {
       },
       {
         $addFields: {
-          offerCount: {$size: "$offers"},
-          createdBy: {$arrayElemAt: ["$createdByUser", 0]},
+          offerCount: { $size: "$offers" },
+          createdBy: { $arrayElemAt: ["$createdByUser", 0] },
           formattedDate: {
             $switch: {
               branches: [
                 {
-                  case: {$eq: ["$dateType", "Easy"]},
+                  case: { $eq: ["$dateType", "Easy"] },
                   then: "Flexible date",
                 },
                 {
-                  case: {$eq: ["$dateType", "DoneBy"]},
+                  case: { $eq: ["$dateType", "DoneBy"] },
                   then: {
                     $concat: [
                       "Due by ",
@@ -1894,7 +1948,7 @@ exports.searchTasks = async (req, res) => {
                   },
                 },
                 {
-                  case: {$eq: ["$dateType", "DoneOn"]},
+                  case: { $eq: ["$dateType", "DoneOn"] },
                   then: {
                     $concat: [
                       "On ",
@@ -1982,16 +2036,16 @@ const getSortQuery = (sort) => {
     case "newest":
     case "newest_first":
     case "recommended": // Treat recommended as newest
-      return {createdAt: -1};
+      return { createdAt: -1 };
     case "oldest":
     case "oldest_first":
-      return {createdAt: 1};
+      return { createdAt: 1 };
     case "lowest_budget":
-      return {budget: 1};
+      return { budget: 1 };
     case "highest_budget":
-      return {budget: -1};
+      return { budget: -1 };
     default:
-      return {createdAt: -1};
+      return { createdAt: -1 };
   }
 };
 
@@ -1999,12 +2053,12 @@ const getSortQuery = (sort) => {
 exports.getTaskQuestions = async (req, res) => {
   try {
     const { taskId } = req.params;
-    
+
     // Validate taskId format
     if (!mongoose.Types.ObjectId.isValid(taskId)) {
       return res.status(400).json({
         success: false,
-        error: "Invalid task ID format"
+        error: "Invalid task ID format",
       });
     }
 
@@ -2013,12 +2067,12 @@ exports.getTaskQuestions = async (req, res) => {
     if (!task) {
       return res.status(404).json({
         success: false,
-        error: "Task not found"
+        error: "Task not found",
       });
     }
 
     // Get questions with populated user data
-    const questions = await Question.find({taskId: taskId})
+    const questions = await Question.find({ taskId: taskId })
       .populate("userId", "firstName lastName avatar email")
       .populate("posterId", "firstName lastName avatar email")
       .populate("answer.answeredBy", "firstName lastName avatar email")
@@ -2027,42 +2081,44 @@ exports.getTaskQuestions = async (req, res) => {
 
     // Transform the data to match frontend expectations
     // Frontend expects 'answers' array, but we store as 'answer' object
-    const formattedQuestions = questions.map(question => {
+    const formattedQuestions = questions.map((question) => {
       const formatted = {
         ...question,
-        answers: [] // Initialize answers array
+        answers: [], // Initialize answers array
       };
-      
+
       // If there's an answer, convert it to an array format
       if (question.answer && question.answer.text) {
-        formatted.answers = [{
-          _id: question._id + '_answer', // Create a pseudo ID for the answer
-          questionId: question._id,
-          answer: question.answer.text,
-          images: question.answer.images || [],
-          answeredBy: question.answer.answeredBy,
-          createdAt: question.answer.timestamp || question.updatedAt
-        }];
+        formatted.answers = [
+          {
+            _id: question._id + "_answer", // Create a pseudo ID for the answer
+            questionId: question._id,
+            answer: question.answer.text,
+            images: question.answer.images || [],
+            answeredBy: question.answer.answeredBy,
+            createdAt: question.answer.timestamp || question.updatedAt,
+          },
+        ];
       }
-      
+
       return formatted;
     });
 
     console.log(`✅ Returning ${formattedQuestions.length} questions`);
-    formattedQuestions.forEach(q => {
+    formattedQuestions.forEach((q) => {
       console.log(`   Question ${q._id}: ${q.answers.length} answer(s)`);
     });
 
     res.status(200).json({
       success: true,
       count: formattedQuestions.length,
-      data: formattedQuestions
+      data: formattedQuestions,
     });
   } catch (err) {
     console.error("Error fetching questions:", err);
     res.status(500).json({
       success: false,
-      error: "Server error while fetching questions"
+      error: "Server error while fetching questions",
     });
   }
 };
@@ -2072,60 +2128,64 @@ exports.createQuestion = async (req, res) => {
   try {
     const { taskId } = req.params;
     // Check multiple possible field names from frontend
-    const questionText = req.body.questionText || req.body.text || req.body.question;
-    
+    const questionText =
+      req.body.questionText || req.body.text || req.body.question;
+
     // Add detailed logging for debugging
-    console.log('🔍 CREATE QUESTION DEBUG:');
-    console.log('- Task ID:', taskId);
-    console.log('- Request body:', JSON.stringify(req.body, null, 2));
-    console.log('- Question text received:', questionText);
-    console.log('- Question text type:', typeof questionText);
-    console.log('- Content-Type:', req.headers['content-type']);
-    console.log('- Files uploaded:', req.files?.length || 0);
-    
+    console.log("🔍 CREATE QUESTION DEBUG:");
+    console.log("- Task ID:", taskId);
+    console.log("- Request body:", JSON.stringify(req.body, null, 2));
+    console.log("- Question text received:", questionText);
+    console.log("- Question text type:", typeof questionText);
+    console.log("- Content-Type:", req.headers["content-type"]);
+    console.log("- Files uploaded:", req.files?.length || 0);
+
     // Validate taskId format
     if (!mongoose.Types.ObjectId.isValid(taskId)) {
-      console.log('❌ Invalid task ID format');
+      console.log("❌ Invalid task ID format");
       return res.status(400).json({
         success: false,
-        error: "Invalid task ID format"
+        error: "Invalid task ID format",
       });
     }
 
     // Validate question text
     if (!questionText || questionText.trim().length === 0) {
-      console.log('❌ Missing or empty question text');
+      console.log("❌ Missing or empty question text");
       console.log('📝 Expected: { "questionText": "your question" }');
-      console.log('📝 Also accepts: { "text": "your question" } or { "question": "your question" }');
+      console.log(
+        '📝 Also accepts: { "text": "your question" } or { "question": "your question" }'
+      );
       return res.status(400).json({
         success: false,
-        error: "Question text is required. Use 'questionText', 'text', or 'question' field."
+        error:
+          "Question text is required. Use 'questionText', 'text', or 'question' field.",
       });
     }
 
     if (questionText.trim().length > 500) {
-      console.log('❌ Question text too long:', questionText.trim().length);
+      console.log("❌ Question text too long:", questionText.trim().length);
       return res.status(400).json({
         success: false,
-        error: "Question text cannot exceed 500 characters"
+        error: "Question text cannot exceed 500 characters",
       });
     }
 
     // Check if task exists
     const task = await Task.findById(taskId);
     if (!task) {
-      console.log('❌ Task not found');
+      console.log("❌ Task not found");
       return res.status(404).json({
         success: false,
-        error: "Task not found"
+        error: "Task not found",
       });
     }
 
-    console.log('✅ All validations passed, creating question');
+    console.log("✅ All validations passed, creating question");
 
     // Get uploaded image URLs from multer-s3
-    const imageUrls = req.files ? req.files.map(file => file.location) : [];
-    
+    const imageUrls = req.files ? req.files.map((file) => file.location) : [];
+
     if (imageUrls.length > 0) {
       console.log(`✅ ${imageUrls.length} images uploaded to S3:`);
       imageUrls.forEach((url, index) => {
@@ -2140,12 +2200,12 @@ exports.createQuestion = async (req, res) => {
       posterId: task.createdBy,
       question: {
         text: questionText.trim(),
-        images: imageUrls  // ✅ Save S3 URLs to MongoDB
+        images: imageUrls, // ✅ Save S3 URLs to MongoDB
       },
     });
 
     await question.save();
-    console.log('✅ Question saved to database with images');
+    console.log("✅ Question saved to database with images");
 
     // Populate the question for response
     const populatedQuestion = await Question.findById(question._id)
@@ -2153,17 +2213,17 @@ exports.createQuestion = async (req, res) => {
       .populate("posterId", "firstName lastName avatar email")
       .lean();
 
-    console.log('✅ Question created successfully');
+    console.log("✅ Question created successfully");
     res.status(201).json({
       success: true,
       message: "Question created successfully",
-      data: populatedQuestion
+      data: populatedQuestion,
     });
   } catch (err) {
     console.error("Error creating question:", err);
     res.status(500).json({
       success: false,
-      error: "Server error while creating question"
+      error: "Server error while creating question",
     });
   }
 };
@@ -2176,99 +2236,126 @@ exports.answerQuestion = async (req, res) => {
     const answerText = req.body.answerText || req.body.text || req.body.answer;
 
     // Add detailed logging for debugging
-    console.log('🔍 ANSWER QUESTION DEBUG:');
-    console.log('- Task ID:', taskId);
-    console.log('- Question ID:', questionId);
-    console.log('- Request body:', JSON.stringify(req.body, null, 2));
-    console.log('- Answer text received:', answerText);
-    console.log('- Answer text type:', typeof answerText);
-    console.log('- Content-Type:', req.headers['content-type']);
-    console.log('- User ID:', req.user?._id);
-    console.log('- Files uploaded:', req.files?.length || 0);
-    
+    console.log("🔍 ANSWER QUESTION DEBUG:");
+    console.log("- Task ID:", taskId);
+    console.log("- Question ID:", questionId);
+    console.log("- Request body:", JSON.stringify(req.body, null, 2));
+    console.log("- Answer text received:", answerText);
+    console.log("- Answer text type:", typeof answerText);
+    console.log("- Content-Type:", req.headers["content-type"]);
+    console.log("- User ID:", req.user?._id);
+    console.log("- Files uploaded:", req.files?.length || 0);
+
     // Validate IDs format
-    if (!mongoose.Types.ObjectId.isValid(taskId) || !mongoose.Types.ObjectId.isValid(questionId)) {
-      console.log('❌ Invalid ID format - TaskID valid:', mongoose.Types.ObjectId.isValid(taskId), 'QuestionID valid:', mongoose.Types.ObjectId.isValid(questionId));
+    if (
+      !mongoose.Types.ObjectId.isValid(taskId) ||
+      !mongoose.Types.ObjectId.isValid(questionId)
+    ) {
+      console.log(
+        "❌ Invalid ID format - TaskID valid:",
+        mongoose.Types.ObjectId.isValid(taskId),
+        "QuestionID valid:",
+        mongoose.Types.ObjectId.isValid(questionId)
+      );
       return res.status(400).json({
         success: false,
-        error: "Invalid task ID or question ID format"
+        error: "Invalid task ID or question ID format",
       });
     }
 
     // Validate answer text
     if (!answerText || answerText.trim().length === 0) {
-      console.log('❌ Missing or empty answer text');
+      console.log("❌ Missing or empty answer text");
       console.log('📝 Expected: { "answerText": "your answer" }');
-      console.log('📝 Also accepts: { "text": "your answer" } or { "answer": "your answer" }');
+      console.log(
+        '📝 Also accepts: { "text": "your answer" } or { "answer": "your answer" }'
+      );
       return res.status(400).json({
         success: false,
-        error: "Answer text is required. Use 'answerText', 'text', or 'answer' field."
+        error:
+          "Answer text is required. Use 'answerText', 'text', or 'answer' field.",
       });
     }
 
     if (answerText.trim().length > 1000) {
-      console.log('❌ Answer text too long:', answerText.trim().length);
+      console.log("❌ Answer text too long:", answerText.trim().length);
       return res.status(400).json({
         success: false,
-        error: "Answer text cannot exceed 1000 characters"
+        error: "Answer text cannot exceed 1000 characters",
       });
     }
 
-    console.log('✅ Basic validation passed, checking question existence');
+    console.log("✅ Basic validation passed, checking question existence");
 
     // Find the question and populate task data
     const question = await Question.findOne({
       _id: questionId,
       taskId: taskId,
-    }).populate('taskId');
+    }).populate("taskId");
 
     if (!question) {
-      console.log('❌ Question not found');
+      console.log("❌ Question not found");
       return res.status(404).json({
         success: false,
-        error: "Question not found"
+        error: "Question not found",
       });
     }
 
     const task = question.taskId;
-    console.log('✅ Question found, checking authorization');
-    console.log('- Question poster ID (task creator):', question.posterId.toString());
-    console.log('- Question asker ID:', question.userId.toString());
-    console.log('- Current user ID:', req.user._id.toString());
-    console.log('- Is task creator?:', question.posterId.toString() === req.user._id.toString());
-    console.log('- Is question asker?:', question.userId.toString() === req.user._id.toString());
+    console.log("✅ Question found, checking authorization");
+    console.log(
+      "- Question poster ID (task creator):",
+      question.posterId.toString()
+    );
+    console.log("- Question asker ID:", question.userId.toString());
+    console.log("- Current user ID:", req.user._id.toString());
+    console.log(
+      "- Is task creator?:",
+      question.posterId.toString() === req.user._id.toString()
+    );
+    console.log(
+      "- Is question asker?:",
+      question.userId.toString() === req.user._id.toString()
+    );
 
     // Check if task has an assigned user
-    const isAssignedTasker = task.assignedTo && task.assignedTo.toString() === req.user._id.toString();
-    console.log('- Task assigned to:', task.assignedTo?.toString() || 'No one');
-    console.log('- Is assigned tasker?:', isAssignedTasker);
+    const isAssignedTasker =
+      task.assignedTo && task.assignedTo.toString() === req.user._id.toString();
+    console.log("- Task assigned to:", task.assignedTo?.toString() || "No one");
+    console.log("- Is assigned tasker?:", isAssignedTasker);
 
     // Check if user has made an offer on this task (is a task taker)
     const userOffer = await Offer.findOne({
       taskId: taskId,
-      taskTakerId: req.user._id
+      taskTakerId: req.user._id,
     });
     const isTaskTaker = !!userOffer;
-    console.log('- Has made offer (task taker)?:', isTaskTaker);
+    console.log("- Has made offer (task taker)?:", isTaskTaker);
 
     // Open Q&A System: Allow any authenticated user to answer questions
     // This promotes marketplace-style discussion and community engagement
-    const isTaskPoster = question.posterId.toString() === req.user._id.toString();
-    const isQuestionAsker = question.userId.toString() === req.user._id.toString();
-    
+    const isTaskPoster =
+      question.posterId.toString() === req.user._id.toString();
+    const isQuestionAsker =
+      question.userId.toString() === req.user._id.toString();
+
     // For an open marketplace Q&A system, we allow any authenticated user to answer
-    console.log('✅ Authorization passed - open Q&A system allows all authenticated users to answer');
+    console.log(
+      "✅ Authorization passed - open Q&A system allows all authenticated users to answer"
+    );
 
     // For open Q&A, allow updating existing answers or adding new ones
     if (question.status === "answered") {
-      console.log('ℹ️ Question already has an answer - updating with new answer');
+      console.log(
+        "ℹ️ Question already has an answer - updating with new answer"
+      );
     }
 
-    console.log('✅ All validations passed, updating question with answer');
+    console.log("✅ All validations passed, updating question with answer");
 
     // Get uploaded image URLs from multer-s3
-    const imageUrls = req.files ? req.files.map(file => file.location) : [];
-    
+    const imageUrls = req.files ? req.files.map((file) => file.location) : [];
+
     if (imageUrls.length > 0) {
       console.log(`✅ ${imageUrls.length} images uploaded to S3 for answer:`);
       imageUrls.forEach((url, index) => {
@@ -2281,12 +2368,12 @@ exports.answerQuestion = async (req, res) => {
       text: answerText.trim(),
       timestamp: new Date(),
       answeredBy: req.user._id, // Track who answered in open Q&A system
-      images: imageUrls  // ✅ Save S3 URLs to MongoDB
+      images: imageUrls, // ✅ Save S3 URLs to MongoDB
     };
     question.status = "answered";
 
     await question.save();
-    console.log('✅ Question updated and saved to database with answer images');
+    console.log("✅ Question updated and saved to database with answer images");
 
     // Populate the question for response including answer details
     const populatedQuestion = await Question.findById(question._id)
@@ -2295,17 +2382,17 @@ exports.answerQuestion = async (req, res) => {
       .populate("answer.answeredBy", "firstName lastName avatar email")
       .lean();
 
-    console.log('✅ Answer created successfully');
+    console.log("✅ Answer created successfully");
     res.status(200).json({
       success: true,
       message: "Question answered successfully",
-      data: populatedQuestion
+      data: populatedQuestion,
     });
   } catch (err) {
     console.error("Error answering question:", err);
     res.status(500).json({
       success: false,
-      error: "Server error while answering question"
+      error: "Server error while answering question",
     });
   }
 };
@@ -2369,7 +2456,7 @@ exports.searchTasks = async (req, res) => {
       sort = "recommended",
     } = req.query;
 
-    console.log("Search params received:", {categories, filters});
+    console.log("Search params received:", { categories, filters });
 
     // Remove hardcoded status filter to allow all task statuses in search results
     const query = {};
@@ -2388,7 +2475,7 @@ exports.searchTasks = async (req, res) => {
             query.isRemote = false;
             break;
           case "With photos only":
-            query.images = {$exists: true, $ne: []};
+            query.images = { $exists: true, $ne: [] };
             break;
           case "Urgent tasks only":
             query.isUrgent = true;
@@ -2411,7 +2498,7 @@ exports.searchTasks = async (req, res) => {
 
       if (categoryArray.length > 0) {
         query.$and = categoryArray.map((category) => ({
-          categories: {$regex: new RegExp(`\\b${category.trim()}\\b`, "i")},
+          categories: { $regex: new RegExp(`\\b${category.trim()}\\b`, "i") },
         }));
       }
     }
@@ -2433,7 +2520,7 @@ exports.searchTasks = async (req, res) => {
             // Handle 500+ case - only set minimum, no maximum
             const minValue = parseFloat(maxPrice.replace("+", ""));
             if (!isNaN(minValue)) {
-              query.budget = {$gte: minValue};
+              query.budget = { $gte: minValue };
             }
           } else {
             const max = parseFloat(maxPrice);
@@ -2455,15 +2542,15 @@ exports.searchTasks = async (req, res) => {
       if (location.toLowerCase() === "remote") {
         query.isRemote = true;
       } else {
-        query["location.address"] = {$regex: location, $options: "i"};
+        query["location.address"] = { $regex: location, $options: "i" };
       }
     }
 
     // Search handling
     if (search && search !== "undefined") {
       query.$or = [
-        {title: {$regex: search, $options: "i"}},
-        {details: {$regex: search, $options: "i"}},
+        { title: { $regex: search, $options: "i" } },
+        { details: { $regex: search, $options: "i" } },
       ];
     }
 
@@ -2471,7 +2558,7 @@ exports.searchTasks = async (req, res) => {
 
     // Rest of your existing aggregation pipeline
     const tasks = await Task.aggregate([
-      {$match: query},
+      { $match: query },
       {
         $lookup: {
           from: "users",
@@ -2490,17 +2577,17 @@ exports.searchTasks = async (req, res) => {
       },
       {
         $addFields: {
-          offerCount: {$size: "$offers"},
-          createdBy: {$arrayElemAt: ["$createdByUser", 0]},
+          offerCount: { $size: "$offers" },
+          createdBy: { $arrayElemAt: ["$createdByUser", 0] },
           formattedDate: {
             $switch: {
               branches: [
                 {
-                  case: {$eq: ["$dateType", "Easy"]},
+                  case: { $eq: ["$dateType", "Easy"] },
                   then: "Flexible date",
                 },
                 {
-                  case: {$eq: ["$dateType", "DoneBy"]},
+                  case: { $eq: ["$dateType", "DoneBy"] },
                   then: {
                     $concat: [
                       "Due by ",
@@ -2516,7 +2603,7 @@ exports.searchTasks = async (req, res) => {
                   },
                 },
                 {
-                  case: {$eq: ["$dateType", "DoneOn"]},
+                  case: { $eq: ["$dateType", "DoneOn"] },
                   then: {
                     $concat: [
                       "On ",
@@ -2609,15 +2696,15 @@ const getSortQueryForAggregation = (sort) => {
       };
     case "newest":
     case "newest_first":
-      return {createdAt: -1};
+      return { createdAt: -1 };
     case "oldest":
     case "oldest_first":
-      return {createdAt: 1};
+      return { createdAt: 1 };
     case "lowest_budget":
-      return {budget: 1};
+      return { budget: 1 };
     case "highest_budget":
-      return {budget: -1};
+      return { budget: -1 };
     default:
-      return {createdAt: -1};
+      return { createdAt: -1 };
   }
 };

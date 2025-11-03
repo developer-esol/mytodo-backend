@@ -1,8 +1,8 @@
 const mongoose = require("mongoose");
-const Chat = require("../models/Chat");
-const Task = require("../models/Task");
-const Offer = require("../models/Offer");
-const { formatUserObject } = require('../utils/userUtils');
+const Chat = require("../models/chat/Chat");
+const Task = require("../models/task/Task");
+const Offer = require("../models/task/Offer");
+const { formatUserObject } = require("../utils/userUtils");
 
 exports.getChats = async (req, res) => {
   try {
@@ -22,13 +22,13 @@ exports.getChats = async (req, res) => {
     // Find all chats where the user is involved with lean() for better performance
     console.log("Searching for chats with userId:", userId);
     const chats = await Chat.find({
-      $or: [{posterId: userId}, {taskerId: userId}],
+      $or: [{ posterId: userId }, { taskerId: userId }],
     })
       .populate("posterId", "firstName lastName avatar rating")
       .populate("taskerId", "firstName lastName avatar rating")
-      .sort({createdAt: -1})
+      .sort({ createdAt: -1 })
       .lean(); // Convert to plain JS objects for better performance
-    
+
     console.log("Found chats count:", chats.length);
 
     // Early return if no chats found
@@ -50,7 +50,7 @@ exports.getChats = async (req, res) => {
 
     // Fetch related tasks in a single query
     const tasks = await Task.find({
-      _id: {$in: uniqueTaskIds},
+      _id: { $in: uniqueTaskIds },
     }).lean();
 
     // Create a task map for faster lookup
@@ -65,8 +65,10 @@ exports.getChats = async (req, res) => {
 
       // Determine the other participant (not the current user)
       const otherParticipant =
-        chat.posterId && chat.posterId._id && chat.posterId._id.toString() === userId.toString() 
-          ? chat.taskerId 
+        chat.posterId &&
+        chat.posterId._id &&
+        chat.posterId._id.toString() === userId.toString()
+          ? chat.taskerId
           : chat.posterId;
 
       return {
@@ -81,7 +83,7 @@ exports.getChats = async (req, res) => {
         unreadCount: chat.unreadCount || 0,
       };
     });
-    
+
     console.log("Formatted result count:", result.length);
 
     res.status(200).json({
@@ -113,9 +115,11 @@ exports.createOrUpdateChat = async (req, res) => {
     }
 
     // Validate IDs
-    if (!mongoose.Types.ObjectId.isValid(taskId) || 
-        !mongoose.Types.ObjectId.isValid(offerId) ||
-        !mongoose.Types.ObjectId.isValid(userId)) {
+    if (
+      !mongoose.Types.ObjectId.isValid(taskId) ||
+      !mongoose.Types.ObjectId.isValid(offerId) ||
+      !mongoose.Types.ObjectId.isValid(userId)
+    ) {
       return res.status(400).json({
         success: false,
         message: "Invalid taskId, offerId, or userId",
@@ -147,19 +151,19 @@ exports.createOrUpdateChat = async (req, res) => {
           taskId: taskId,
           $or: [
             { posterId: task.createdBy, taskerId: offer.taskTakerId },
-            { posterId: offer.taskTakerId, taskerId: task.createdBy }
-          ]
+            { posterId: offer.taskTakerId, taskerId: task.createdBy },
+          ],
         },
         {
           $set: {
             chatStatus: "accept",
             status: "active",
-            updatedAt: new Date()
-          }
+            updatedAt: new Date(),
+          },
         },
         {
           new: true,
-          upsert: false // Don't create if doesn't exist
+          upsert: false, // Don't create if doesn't exist
         }
       );
 
@@ -175,7 +179,7 @@ exports.createOrUpdateChat = async (req, res) => {
       res.status(200).json({
         success: true,
         data: updatedChat,
-        message: "Chat status updated to accept successfully"
+        message: "Chat status updated to accept successfully",
       });
     } else {
       return res.status(400).json({
@@ -183,7 +187,6 @@ exports.createOrUpdateChat = async (req, res) => {
         message: "Invalid action or chatStatus",
       });
     }
-
   } catch (error) {
     console.error("Error updating chat status:", error);
     res.status(500).json({

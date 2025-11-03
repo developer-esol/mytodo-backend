@@ -1,6 +1,6 @@
-const Review = require("../models/Review");
-const Task = require("../models/Task");
-const User = require("../models/User");
+const Review = require("../models/review/Review");
+const Task = require("../models/task/Task");
+const User = require("../models/user/User");
 const mongoose = require("mongoose");
 
 const isValidObjectId = mongoose.Types.ObjectId.isValid;
@@ -19,7 +19,7 @@ exports.submitReview = async (req, res) => {
     if (!isValidObjectId(taskId)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid task ID"
+        message: "Invalid task ID",
       });
     }
 
@@ -27,17 +27,17 @@ exports.submitReview = async (req, res) => {
     if (!rating || rating < 1 || rating > 5) {
       return res.status(400).json({
         success: false,
-        message: "Rating must be between 1 and 5"
+        message: "Rating must be between 1 and 5",
       });
     }
 
     // Check if user can review this task
     const eligibility = await Review.canUserReview(taskId, reviewerId);
-    
+
     if (!eligibility.canReview) {
       return res.status(400).json({
         success: false,
-        message: eligibility.message
+        message: eligibility.message,
       });
     }
 
@@ -48,7 +48,7 @@ exports.submitReview = async (req, res) => {
       reviewee: eligibility.revieweeId,
       revieweeRole: eligibility.revieweeRole,
       rating: parseInt(rating),
-      reviewText: reviewText ? reviewText.trim() : undefined
+      reviewText: reviewText ? reviewText.trim() : undefined,
     });
 
     await review.save();
@@ -57,28 +57,28 @@ exports.submitReview = async (req, res) => {
     await Review.updateUserRating(eligibility.revieweeId);
 
     // Populate reviewer and reviewee details
-    await review.populate('reviewer reviewee', 'firstName lastName avatar');
-    await review.populate('task', 'title');
+    await review.populate("reviewer reviewee", "firstName lastName avatar");
+    await review.populate("task", "title");
 
     res.status(201).json({
       success: true,
       data: review,
-      message: "Review submitted successfully"
+      message: "Review submitted successfully",
     });
   } catch (error) {
     console.error("Error submitting review:", error);
-    
+
     // Handle duplicate review error
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
-        message: "You have already reviewed this task"
+        message: "You have already reviewed this task",
       });
     }
 
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to submit review"
+      message: error.message || "Failed to submit review",
     });
   }
 };
@@ -96,17 +96,17 @@ exports.getUserReviews = async (req, res) => {
     if (!isValidObjectId(userId)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid user ID"
+        message: "Invalid user ID",
       });
     }
 
     // Build query
     const query = {
       reviewee: userId,
-      isVisible: true
+      isVisible: true,
     };
 
-    if (role && ['poster', 'tasker'].includes(role)) {
+    if (role && ["poster", "tasker"].includes(role)) {
       query.revieweeRole = role;
     }
 
@@ -115,8 +115,8 @@ exports.getUserReviews = async (req, res) => {
 
     // Get reviews
     const reviews = await Review.find(query)
-      .populate('reviewer', 'firstName lastName avatar')
-      .populate('task', 'title')
+      .populate("reviewer", "firstName lastName avatar")
+      .populate("task", "title")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -135,16 +135,16 @@ exports.getUserReviews = async (req, res) => {
           currentPage: parseInt(page),
           totalPages: Math.ceil(totalReviews / parseInt(limit)),
           totalReviews,
-          limit: parseInt(limit)
+          limit: parseInt(limit),
         },
-        ratingStats
-      }
+        ratingStats,
+      },
     });
   } catch (error) {
     console.error("Error getting user reviews:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to get reviews"
+      message: error.message || "Failed to get reviews",
     });
   }
 };
@@ -161,27 +161,27 @@ exports.getTaskReviews = async (req, res) => {
     if (!isValidObjectId(taskId)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid task ID"
+        message: "Invalid task ID",
       });
     }
 
     // Get all reviews for this task
     const reviews = await Review.find({
       task: taskId,
-      isVisible: true
+      isVisible: true,
     })
-      .populate('reviewer reviewee', 'firstName lastName avatar')
+      .populate("reviewer reviewee", "firstName lastName avatar")
       .sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
-      data: reviews
+      data: reviews,
     });
   } catch (error) {
     console.error("Error getting task reviews:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to get task reviews"
+      message: error.message || "Failed to get task reviews",
     });
   }
 };
@@ -198,26 +198,26 @@ exports.getUserRatingStats = async (req, res) => {
     if (!isValidObjectId(userId)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid user ID"
+        message: "Invalid user ID",
       });
     }
 
     // Get overall stats
     const overallStats = await Review.calculateUserRating(userId);
-    
+
     // Get poster stats (reviews received when acting as task creator)
-    const posterStats = await Review.calculateUserRating(userId, 'poster');
-    
+    const posterStats = await Review.calculateUserRating(userId, "poster");
+
     // Get tasker stats (reviews received when acting as task doer)
-    const taskerStats = await Review.calculateUserRating(userId, 'tasker');
+    const taskerStats = await Review.calculateUserRating(userId, "tasker");
 
     // Get recent reviews
     const recentReviews = await Review.find({
       reviewee: userId,
-      isVisible: true
+      isVisible: true,
     })
-      .populate('reviewer', 'firstName lastName avatar')
-      .populate('task', 'title')
+      .populate("reviewer", "firstName lastName avatar")
+      .populate("task", "title")
       .sort({ createdAt: -1 })
       .limit(5);
 
@@ -227,14 +227,14 @@ exports.getUserRatingStats = async (req, res) => {
         overall: overallStats,
         asPoster: posterStats,
         asTasker: taskerStats,
-        recentReviews
-      }
+        recentReviews,
+      },
     });
   } catch (error) {
     console.error("Error getting rating stats:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to get rating statistics"
+      message: error.message || "Failed to get rating statistics",
     });
   }
 };
@@ -252,7 +252,7 @@ exports.checkCanReview = async (req, res) => {
     if (!isValidObjectId(taskId)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid task ID"
+        message: "Invalid task ID",
       });
     }
 
@@ -260,13 +260,13 @@ exports.checkCanReview = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: eligibility
+      data: eligibility,
     });
   } catch (error) {
     console.error("Error checking review eligibility:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to check review eligibility"
+      message: error.message || "Failed to check review eligibility",
     });
   }
 };
@@ -285,7 +285,7 @@ exports.updateReview = async (req, res) => {
     if (!isValidObjectId(reviewId)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid review ID"
+        message: "Invalid review ID",
       });
     }
 
@@ -295,7 +295,7 @@ exports.updateReview = async (req, res) => {
     if (!review) {
       return res.status(404).json({
         success: false,
-        message: "Review not found"
+        message: "Review not found",
       });
     }
 
@@ -303,7 +303,7 @@ exports.updateReview = async (req, res) => {
     if (review.reviewer.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
-        message: "You can only update your own reviews"
+        message: "You can only update your own reviews",
       });
     }
 
@@ -312,7 +312,7 @@ exports.updateReview = async (req, res) => {
       if (rating < 1 || rating > 5) {
         return res.status(400).json({
           success: false,
-          message: "Rating must be between 1 and 5"
+          message: "Rating must be between 1 and 5",
         });
       }
       review.rating = parseInt(rating);
@@ -328,19 +328,19 @@ exports.updateReview = async (req, res) => {
     await Review.updateUserRating(review.reviewee);
 
     // Populate details
-    await review.populate('reviewer reviewee', 'firstName lastName avatar');
-    await review.populate('task', 'title');
+    await review.populate("reviewer reviewee", "firstName lastName avatar");
+    await review.populate("task", "title");
 
     res.status(200).json({
       success: true,
       data: review,
-      message: "Review updated successfully"
+      message: "Review updated successfully",
     });
   } catch (error) {
     console.error("Error updating review:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to update review"
+      message: error.message || "Failed to update review",
     });
   }
 };
@@ -358,7 +358,7 @@ exports.deleteReview = async (req, res) => {
     if (!isValidObjectId(reviewId)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid review ID"
+        message: "Invalid review ID",
       });
     }
 
@@ -368,7 +368,7 @@ exports.deleteReview = async (req, res) => {
     if (!review) {
       return res.status(404).json({
         success: false,
-        message: "Review not found"
+        message: "Review not found",
       });
     }
 
@@ -376,7 +376,7 @@ exports.deleteReview = async (req, res) => {
     if (review.reviewer.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
-        message: "You can only delete your own reviews"
+        message: "You can only delete your own reviews",
       });
     }
 
@@ -390,13 +390,13 @@ exports.deleteReview = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Review deleted successfully"
+      message: "Review deleted successfully",
     });
   } catch (error) {
     console.error("Error deleting review:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to delete review"
+      message: error.message || "Failed to delete review",
     });
   }
 };
@@ -415,14 +415,14 @@ exports.respondToReview = async (req, res) => {
     if (!isValidObjectId(reviewId)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid review ID"
+        message: "Invalid review ID",
       });
     }
 
     if (!responseText || responseText.trim().length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Response text is required"
+        message: "Response text is required",
       });
     }
 
@@ -432,7 +432,7 @@ exports.respondToReview = async (req, res) => {
     if (!review) {
       return res.status(404).json({
         success: false,
-        message: "Review not found"
+        message: "Review not found",
       });
     }
 
@@ -440,32 +440,32 @@ exports.respondToReview = async (req, res) => {
     if (review.reviewee.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
-        message: "You can only respond to reviews about you"
+        message: "You can only respond to reviews about you",
       });
     }
 
     // Add response
     review.response = {
       text: responseText.trim(),
-      respondedAt: new Date()
+      respondedAt: new Date(),
     };
 
     await review.save();
 
     // Populate details
-    await review.populate('reviewer reviewee', 'firstName lastName avatar');
-    await review.populate('task', 'title');
+    await review.populate("reviewer reviewee", "firstName lastName avatar");
+    await review.populate("task", "title");
 
     res.status(200).json({
       success: true,
       data: review,
-      message: "Response added successfully"
+      message: "Response added successfully",
     });
   } catch (error) {
     console.error("Error responding to review:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to add response"
+      message: error.message || "Failed to add response",
     });
   }
 };

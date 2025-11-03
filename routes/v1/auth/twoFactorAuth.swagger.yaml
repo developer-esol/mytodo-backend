@@ -1,0 +1,340 @@
+# swagger.yaml
+openapi: 3.0.0
+info:
+  title: Two-Factor Authentication & Registration API
+  version: 1.0.0
+  description: API for user registration and two-step email/SMS verification.
+servers:
+  - url: /api/auth # Assuming this is the base path where your router is mounted
+    description: Primary API Server
+
+components:
+  schemas:
+    VerificationRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+          description: The user's email address.
+        otp:
+          type: string
+          example: "123456"
+          description: The one-time password (OTP) received via email (for the first step) or SMS (for the second step).
+      required:
+        - email
+        - otp
+
+    ResendOTPRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+          description: The user's email address associated with the pending registration.
+        phone:
+          type: string
+          example: "+15551234567"
+          description: Optional. A new phone number to update and resend the OTP to, if different from the one provided during initial signup.
+      required:
+        - email
+
+    SendEmailOTPRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+          description: The user's email address associated with the pending registration.
+      required:
+        - email
+
+    CheckAvailabilityRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+          description: The email to check availability for.
+        phone:
+          type: string
+          example: "+15551234567"
+          description: The phone number to check availability for.
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: New OTP sent successfully
+      required:
+        - success
+        - message
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Email and OTP are required
+      required:
+        - success
+        - message
+
+    OTPVerificationSuccess:
+      type: object
+      properties:
+        verified:
+          type: boolean
+          example: true
+        stage:
+          type: string
+          example: sms
+          description: Indicates the next verification step.
+        message:
+          type: string
+          example: Email verified. SMS OTP sent to phone.
+
+    SMSVerificationSuccess:
+      type: object
+      properties:
+        verified:
+          type: boolean
+          example: true
+        token:
+          type: string
+          description: JWT token for the authenticated user.
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+              example: "60c72b2f9b1e8b0015f8a7e3"
+            email:
+              type: string
+              example: "user@example.com"
+            firstName:
+              type: string
+              example: "John"
+            lastName:
+              type: string
+              example: "Doe"
+            phone:
+              type: string
+              example: "+15551234567"
+            role:
+              type: string
+              example: "user"
+            isVerified:
+              type: boolean
+              example: true
+          description: Details of the newly created and verified user.
+        message:
+          type: string
+          example: Account verified and created successfully!
+
+    CheckAvailabilityResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        results:
+          type: object
+          properties:
+            email:
+              type: object
+              properties:
+                available:
+                  type: boolean
+                  example: false
+                pending:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: Email has pending verification
+            phone:
+              type: object
+              properties:
+                available:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: Phone number is available
+          description: Availability status for email and phone (if provided).
+      required:
+        - success
+        - results
+
+paths:
+  /two-factor-auth/otp-verification:
+    post:
+      tags:
+        - Two-Factor Auth
+      summary: Verify Email OTP and initiate SMS OTP
+      description: Validates the OTP sent via email and, upon success, sends a new OTP via SMS using Twilio Verify.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerificationRequest"
+      responses:
+        "200":
+          description: Email verified, SMS OTP sent successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OTPVerificationSuccess"
+        "400":
+          description: Invalid input, OTP expired, or invalid OTP.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Account already exists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /two-factor-auth/sms-verification:
+    post:
+      tags:
+        - Two-Factor Auth
+      summary: Verify SMS OTP and complete registration
+      description: Validates the OTP sent via SMS (Twilio Verify), and if successful, finalizes the user account creation from the pending user data.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerificationRequest"
+      responses:
+        "200":
+          description: Account fully verified and created. Returns a JWT token and user data.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SMSVerificationSuccess"
+        "400":
+          description: Invalid input, invalid SMS OTP, or conflicting account data.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error during verification or user creation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /two-factor-auth/resend-otp:
+    post:
+      tags:
+        - Two-Factor Auth
+      summary: Resend Email and/or SMS OTP
+      description: Generates a new OTP, updates the pending user record, and resends the OTP via email and SMS (if phone is present). Can be used to update the phone number before resending.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendOTPRequest"
+      responses:
+        "200":
+          description: New OTP sent successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: No pending verification found or phone number is already in use.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to resend OTP.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /two-factor-auth/send-email:
+    post:
+      tags:
+        - Two-Factor Auth
+      summary: Send/Resend Email OTP (standalone)
+      description: Generates and sends a new OTP *only* to the user's email, assuming the user already exists as a pending user. Useful for resending *only* the email OTP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendEmailOTPRequest"
+      responses:
+        "200":
+          description: OTP sent to email successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: User already exists or no pending verification found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Failed to send OTP email.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /two-factor-auth/check-availability:
+    post:
+      tags:
+        - Registration Utilities
+      summary: Check email and phone number availability
+      description: Checks if a given email and/or phone number is already registered or has a pending registration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckAvailabilityRequest"
+      responses:
+        "200":
+          description: Availability results returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckAvailabilityResponse"
+        "500":
+          description: Failed to check availability.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"

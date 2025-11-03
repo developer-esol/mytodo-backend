@@ -1,5 +1,5 @@
-const ratifyIDService = require('../services/ratifyIDService');
-const User = require('../models/User');
+const ratifyIDService = require("../services/ratifyIDService");
+const User = require("../models/user/User");
 
 exports.initializeVerification = async (req, res) => {
   try {
@@ -10,22 +10,22 @@ exports.initializeVerification = async (req, res) => {
 
     // Store verification session ID in user record
     await User.findByIdAndUpdate(userId, {
-      'verification.ratifyId.sessionId': verificationSession.id,
-      'verification.ratifyId.status': 'pending'
+      "verification.ratifyId.sessionId": verificationSession.id,
+      "verification.ratifyId.status": "pending",
     });
 
     res.status(200).json({
       success: true,
       data: {
         verificationUrl: verificationSession.redirectUrl,
-        sessionId: verificationSession.id
-      }
+        sessionId: verificationSession.id,
+      },
     });
   } catch (error) {
-    console.error('Verification initialization error:', error);
+    console.error("Verification initialization error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to initialize verification'
+      message: "Failed to initialize verification",
     });
   }
 };
@@ -35,17 +35,19 @@ exports.handleCallback = async (req, res) => {
     const { sessionId, verificationData } = req.body;
 
     // Verify the callback data with RatifyID
-    const verificationResult = await ratifyIDService.verifyCallback(verificationData);
+    const verificationResult = await ratifyIDService.verifyCallback(
+      verificationData
+    );
 
     // Find user by session ID
     const user = await User.findOne({
-      'verification.ratifyId.sessionId': sessionId
+      "verification.ratifyId.sessionId": sessionId,
     });
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: "User not found",
       });
     }
 
@@ -53,8 +55,8 @@ exports.handleCallback = async (req, res) => {
     user.verification.ratifyId.status = verificationResult.status;
     user.verification.ratifyId.completedAt = new Date();
     user.verification.ratifyId.details = verificationResult;
-    
-    if (verificationResult.status === 'verified') {
+
+    if (verificationResult.status === "verified") {
       user.isVerified = true;
     }
 
@@ -63,14 +65,14 @@ exports.handleCallback = async (req, res) => {
     res.status(200).json({
       success: true,
       data: {
-        status: verificationResult.status
-      }
+        status: verificationResult.status,
+      },
     });
   } catch (error) {
-    console.error('Verification callback error:', error);
+    console.error("Verification callback error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to process verification callback'
+      message: "Failed to process verification callback",
     });
   }
 };
@@ -83,7 +85,7 @@ exports.checkVerificationStatus = async (req, res) => {
     if (!user?.verification?.ratifyId?.sessionId) {
       return res.status(400).json({
         success: false,
-        message: 'No verification session found'
+        message: "No verification session found",
       });
     }
 
@@ -95,14 +97,14 @@ exports.checkVerificationStatus = async (req, res) => {
       success: true,
       data: {
         status: status.status,
-        completedAt: user.verification.ratifyId.completedAt
-      }
+        completedAt: user.verification.ratifyId.completedAt,
+      },
     });
   } catch (error) {
-    console.error('Verification status check error:', error);
+    console.error("Verification status check error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to check verification status'
+      message: "Failed to check verification status",
     });
   }
 };

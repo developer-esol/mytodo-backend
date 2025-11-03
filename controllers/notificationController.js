@@ -1,9 +1,8 @@
 // controllers/notificationController.js
-const notificationService = require('../services/notificationService');
-const Notification = require('../models/Notification');
+const notificationService = require("../services/notificationService");
+const Notification = require("../models/notification/Notification");
 
 class NotificationController {
-
   /**
    * Get user notifications with pagination
    */
@@ -14,31 +13,33 @@ class NotificationController {
         page = 1,
         limit = 20,
         unreadOnly = false,
-        type = null
+        type = null,
       } = req.query;
 
       const options = {
         page: parseInt(page),
         limit: parseInt(limit),
-        unreadOnly: unreadOnly === 'true',
-        type: type || null
+        unreadOnly: unreadOnly === "true",
+        type: type || null,
       };
 
-      const result = await notificationService.getUserNotifications(userId, options);
+      const result = await notificationService.getUserNotifications(
+        userId,
+        options
+      );
 
       res.status(200).json({
         success: true,
         data: result.notifications,
         pagination: result.pagination,
-        unreadCount: result.unreadCount
+        unreadCount: result.unreadCount,
       });
-
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      console.error("Error fetching notifications:", error);
       res.status(500).json({
         success: false,
-        message: 'Failed to fetch notifications',
-        error: error.message
+        message: "Failed to fetch notifications",
+        error: error.message,
       });
     }
   }
@@ -51,14 +52,18 @@ class NotificationController {
       const userId = req.user._id;
       const userEmail = req.user.email;
 
-      console.log(`🔔 Fetching unread count for user: ${userEmail} (${userId})`);
+      console.log(
+        `🔔 Fetching unread count for user: ${userEmail} (${userId})`
+      );
 
       const unreadCount = await Notification.countDocuments({
         recipient: userId,
-        isRead: false
+        isRead: false,
       });
 
-      console.log(`📊 User ${userEmail} has ${unreadCount} unread notifications`);
+      console.log(
+        `📊 User ${userEmail} has ${unreadCount} unread notifications`
+      );
 
       res.status(200).json({
         success: true,
@@ -66,20 +71,19 @@ class NotificationController {
         meta: {
           userId: userId.toString(),
           userEmail: userEmail,
-          timestamp: new Date().toISOString()
-        }
+          timestamp: new Date().toISOString(),
+        },
       });
-
     } catch (error) {
-      console.error('Error fetching unread count:', error);
+      console.error("Error fetching unread count:", error);
       res.status(500).json({
         success: false,
-        message: 'Failed to fetch unread count',
+        message: "Failed to fetch unread count",
         error: error.message,
         meta: {
-          userId: req.user?._id?.toString() || 'UNKNOWN',
-          timestamp: new Date().toISOString()
-        }
+          userId: req.user?._id?.toString() || "UNKNOWN",
+          timestamp: new Date().toISOString(),
+        },
       });
     }
   }
@@ -92,20 +96,25 @@ class NotificationController {
       const userId = req.user._id;
       const { notificationId } = req.params;
 
-      const notification = await notificationService.markAsRead(notificationId, userId);
+      const notification = await notificationService.markAsRead(
+        notificationId,
+        userId
+      );
 
       res.status(200).json({
         success: true,
-        message: 'Notification marked as read',
-        data: notification
+        message: "Notification marked as read",
+        data: notification,
       });
-
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      console.error("Error marking notification as read:", error);
       res.status(500).json({
         success: false,
-        message: error.message === 'Notification not found' ? error.message : 'Failed to mark notification as read',
-        error: error.message
+        message:
+          error.message === "Notification not found"
+            ? error.message
+            : "Failed to mark notification as read",
+        error: error.message,
       });
     }
   }
@@ -121,15 +130,14 @@ class NotificationController {
 
       res.status(200).json({
         success: true,
-        message: `Marked ${result.modifiedCount} notifications as read`
+        message: `Marked ${result.modifiedCount} notifications as read`,
       });
-
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
+      console.error("Error marking all notifications as read:", error);
       res.status(500).json({
         success: false,
-        message: 'Failed to mark all notifications as read',
-        error: error.message
+        message: "Failed to mark all notifications as read",
+        error: error.message,
       });
     }
   }
@@ -142,26 +150,28 @@ class NotificationController {
       const userId = req.user._id;
       const { notificationId } = req.params;
 
-      const deletedNotification = await notificationService.deleteNotification(notificationId, userId);
+      const deletedNotification = await notificationService.deleteNotification(
+        notificationId,
+        userId
+      );
 
       if (!deletedNotification) {
         return res.status(404).json({
           success: false,
-          message: 'Notification not found'
+          message: "Notification not found",
         });
       }
 
       res.status(200).json({
         success: true,
-        message: 'Notification deleted successfully'
+        message: "Notification deleted successfully",
       });
-
     } catch (error) {
-      console.error('Error deleting notification:', error);
+      console.error("Error deleting notification:", error);
       res.status(500).json({
         success: false,
-        message: 'Failed to delete notification',
-        error: error.message
+        message: "Failed to delete notification",
+        error: error.message,
       });
     }
   }
@@ -177,15 +187,14 @@ class NotificationController {
 
       res.status(200).json({
         success: true,
-        data: stats
+        data: stats,
       });
-
     } catch (error) {
-      console.error('Error fetching notification stats:', error);
+      console.error("Error fetching notification stats:", error);
       res.status(500).json({
         success: false,
-        message: 'Failed to fetch notification statistics',
-        error: error.message
+        message: "Failed to fetch notification statistics",
+        error: error.message,
       });
     }
   }
@@ -202,23 +211,25 @@ class NotificationController {
       const options = {
         page: parseInt(page),
         limit: parseInt(limit),
-        type: type.toUpperCase()
+        type: type.toUpperCase(),
       };
 
-      const result = await notificationService.getUserNotifications(userId, options);
+      const result = await notificationService.getUserNotifications(
+        userId,
+        options
+      );
 
       res.status(200).json({
         success: true,
         data: result.notifications,
-        pagination: result.pagination
+        pagination: result.pagination,
       });
-
     } catch (error) {
-      console.error('Error fetching notifications by type:', error);
+      console.error("Error fetching notifications by type:", error);
       res.status(500).json({
         success: false,
-        message: 'Failed to fetch notifications by type',
-        error: error.message
+        message: "Failed to fetch notifications by type",
+        error: error.message,
       });
     }
   }
@@ -229,29 +240,30 @@ class NotificationController {
   async testNotification(req, res) {
     try {
       const userId = req.user._id;
-      const { type = 'SYSTEM_UPDATE', title, message } = req.body;
+      const { type = "SYSTEM_UPDATE", title, message } = req.body;
 
       const notification = await notificationService.createNotification({
         recipient: userId,
         type: type.toUpperCase(),
-        title: title || 'Test Notification',
-        message: message || 'This is a test notification to verify the system is working.',
-        priority: 'NORMAL',
-        actionUrl: '/dashboard'
+        title: title || "Test Notification",
+        message:
+          message ||
+          "This is a test notification to verify the system is working.",
+        priority: "NORMAL",
+        actionUrl: "/dashboard",
       });
 
       res.status(201).json({
         success: true,
-        message: 'Test notification created successfully',
-        data: notification
+        message: "Test notification created successfully",
+        data: notification,
       });
-
     } catch (error) {
-      console.error('Error creating test notification:', error);
+      console.error("Error creating test notification:", error);
       res.status(500).json({
         success: false,
-        message: 'Failed to create test notification',
-        error: error.message
+        message: "Failed to create test notification",
+        error: error.message,
       });
     }
   }
@@ -262,11 +274,11 @@ class NotificationController {
   async testSoundNotification(req, res) {
     try {
       const userId = req.user._id;
-      const { 
-        type = 'OFFER_MADE', 
-        title = 'Test Sound Alert', 
-        message = 'This is a test notification with sound alert!',
-        priority = 'HIGH'
+      const {
+        type = "OFFER_MADE",
+        title = "Test Sound Alert",
+        message = "This is a test notification with sound alert!",
+        priority = "HIGH",
       } = req.body;
 
       const notification = await notificationService.createNotification({
@@ -275,29 +287,28 @@ class NotificationController {
         title,
         message,
         priority: priority.toUpperCase(),
-        actionUrl: '/dashboard',
+        actionUrl: "/dashboard",
         metadata: {
           testNotification: true,
-          soundEnabled: true
-        }
+          soundEnabled: true,
+        },
       });
 
       res.status(201).json({
         success: true,
-        message: 'Test sound notification created successfully',
+        message: "Test sound notification created successfully",
         data: {
           ...notification.toObject(),
           playSound: true,
-          soundType: 'notification_alert'
-        }
+          soundType: "notification_alert",
+        },
       });
-
     } catch (error) {
-      console.error('Error creating test sound notification:', error);
+      console.error("Error creating test sound notification:", error);
       res.status(500).json({
         success: false,
-        message: 'Failed to create test sound notification',
-        error: error.message
+        message: "Failed to create test sound notification",
+        error: error.message,
       });
     }
   }
@@ -307,21 +318,21 @@ class NotificationController {
    */
   async webhook(req, res) {
     try {
-      const { 
-        userId, 
-        type, 
-        title, 
-        message, 
+      const {
+        userId,
+        type,
+        title,
+        message,
         metadata = {},
-        priority = 'NORMAL',
-        actionUrl 
+        priority = "NORMAL",
+        actionUrl,
       } = req.body;
 
       // Validate required fields
       if (!userId || !type || !title || !message) {
         return res.status(400).json({
           success: false,
-          message: 'Missing required fields: userId, type, title, message'
+          message: "Missing required fields: userId, type, title, message",
         });
       }
 
@@ -332,21 +343,20 @@ class NotificationController {
         message,
         metadata,
         priority: priority.toUpperCase(),
-        actionUrl
+        actionUrl,
       });
 
       res.status(201).json({
         success: true,
-        message: 'Webhook notification processed successfully',
-        data: notification
+        message: "Webhook notification processed successfully",
+        data: notification,
       });
-
     } catch (error) {
-      console.error('Error processing webhook notification:', error);
+      console.error("Error processing webhook notification:", error);
       res.status(500).json({
         success: false,
-        message: 'Failed to process webhook notification',
-        error: error.message
+        message: "Failed to process webhook notification",
+        error: error.message,
       });
     }
   }
@@ -366,14 +376,14 @@ class NotificationController {
           OFFER_ACCEPTED: true,
           TASK_COMPLETED: true,
           PAYMENT_RECEIVED: true,
-          MESSAGE_RECEIVED: false
+          MESSAGE_RECEIVED: false,
         },
         push: {
           OFFER_MADE: true,
           OFFER_ACCEPTED: true,
           TASK_COMPLETED: true,
           PAYMENT_RECEIVED: true,
-          MESSAGE_RECEIVED: true
+          MESSAGE_RECEIVED: true,
         },
         inApp: {
           OFFER_MADE: true,
@@ -381,21 +391,20 @@ class NotificationController {
           TASK_COMPLETED: true,
           PAYMENT_RECEIVED: true,
           MESSAGE_RECEIVED: true,
-          SYSTEM_UPDATE: true
-        }
+          SYSTEM_UPDATE: true,
+        },
       };
 
       res.status(200).json({
         success: true,
-        data: preferences
+        data: preferences,
       });
-
     } catch (error) {
-      console.error('Error fetching notification preferences:', error);
+      console.error("Error fetching notification preferences:", error);
       res.status(500).json({
         success: false,
-        message: 'Failed to fetch notification preferences',
-        error: error.message
+        message: "Failed to fetch notification preferences",
+        error: error.message,
       });
     }
   }
@@ -409,13 +418,18 @@ class NotificationController {
       const userEmail = req.user.email;
 
       // Get notification counts
-      const totalCount = await Notification.countDocuments({ recipient: userId });
-      const unreadCount = await Notification.countDocuments({ recipient: userId, isRead: false });
+      const totalCount = await Notification.countDocuments({
+        recipient: userId,
+      });
+      const unreadCount = await Notification.countDocuments({
+        recipient: userId,
+        isRead: false,
+      });
       const readCount = totalCount - unreadCount;
 
       // Get recent notifications
       const recentNotifications = await Notification.find({ recipient: userId })
-        .select('title type isRead createdAt')
+        .select("title type isRead createdAt")
         .sort({ createdAt: -1 })
         .limit(5);
 
@@ -423,7 +437,7 @@ class NotificationController {
       const userInfo = {
         id: userId,
         email: userEmail,
-        tokenValid: true
+        tokenValid: true,
       };
 
       res.status(200).json({
@@ -434,38 +448,40 @@ class NotificationController {
           notifications: {
             total: totalCount,
             unread: unreadCount,
-            read: readCount
+            read: readCount,
           },
-          recentNotifications: recentNotifications.map(n => ({
+          recentNotifications: recentNotifications.map((n) => ({
             title: n.title,
             type: n.type,
             isRead: n.isRead,
-            createdAt: n.createdAt
+            createdAt: n.createdAt,
           })),
           frontendChecklist: {
-            'API_ENDPOINT_CORRECT': 'Check if calling /api/notifications/unread-count',
-            'JWT_TOKEN_VALID': 'Verify JWT token is valid and belongs to this user',
-            'RESPONSE_PARSING': 'Check if parsing response.data.unreadCount correctly',
-            'USER_ID_MATCH': 'Verify user ID in token matches expected user'
+            API_ENDPOINT_CORRECT:
+              "Check if calling /api/notifications/unread-count",
+            JWT_TOKEN_VALID:
+              "Verify JWT token is valid and belongs to this user",
+            RESPONSE_PARSING:
+              "Check if parsing response.data.unreadCount correctly",
+            USER_ID_MATCH: "Verify user ID in token matches expected user",
           },
           expectedResponse: {
             success: true,
-            unreadCount: unreadCount
-          }
-        }
+            unreadCount: unreadCount,
+          },
+        },
       });
-
     } catch (error) {
-      console.error('Error in debug endpoint:', error);
+      console.error("Error in debug endpoint:", error);
       res.status(500).json({
         success: false,
-        message: 'Debug endpoint failed',
+        message: "Debug endpoint failed",
         error: error.message,
         debug: {
           timestamp: new Date().toISOString(),
-          userId: req.user?._id || 'NOT_FOUND',
-          errorDetails: error.stack
-        }
+          userId: req.user?._id || "NOT_FOUND",
+          errorDetails: error.stack,
+        },
       });
     }
   }

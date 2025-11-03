@@ -1,0 +1,265 @@
+openapi: 3.0.3
+info:
+  title: MyTodo Backend - Auth API
+  version: 1.0.0
+  description: Authentication endpoints (Google auth, password reset)
+servers:
+  - url: /api/v1/auth
+    description: Auth routes base path
+tags:
+  - name: Auth
+    description: Authentication endpoints (Google auth, password reset)
+
+paths:
+  /google:
+    post:
+      tags: [Auth]
+      summary: Sign in / register with Google credential
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoogleAuthRequest"
+      responses:
+        "200":
+          description: Authentication successful - returns JWT and user info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request password reset email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+      responses:
+        "200":
+          description: Generic success message (do not reveal account existence)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericMessage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password using token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+      responses:
+        "200":
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericMessage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /validate-reset-token:
+    post:
+      tags: [Auth]
+      summary: Validate a password reset token (without changing password)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ValidateResetTokenRequest"
+      responses:
+        "200":
+          description: Token validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Token is valid."
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /resend-forgot-password:
+    post:
+      tags: [Auth]
+      summary: Resend password reset email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendForgotPasswordRequest"
+      responses:
+        "200":
+          description: Generic success message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericMessage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+components:
+  responses:
+    BadRequest:
+      description: Invalid input or missing fields.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ServerError:
+      description: Internal Server Error.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    # --- ADDED THIS MISSING SCHEMA ---
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "Invalid email format."
+        error:
+          type: string
+          description: Optional detailed error code or stack trace (in development).
+          example: "VALIDATION_ERROR"
+    # --------------------------------
+
+    GoogleAuthRequest:
+      type: object
+      required:
+        - credential
+      properties:
+        credential:
+          type: string
+          description: Google ID token from client
+
+    ForgotPasswordRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+
+    ResendForgotPasswordRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+
+    ResetPasswordRequest:
+      type: object
+      required:
+        - token
+        - email
+        - newPassword
+      properties:
+        token:
+          type: string
+          example: "a1b2c3d4e5f6g7h8i9j0"
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        newPassword:
+          type: string
+          minLength: 6
+          example: "StrongP@sswOrd123"
+
+    ValidateResetTokenRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          example: "a1b2c3d4e5f6g7h8i9j0"
+
+    TokenResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+              example: "60c72b2f9b1e8b0015f8a7e3"
+            email:
+              type: string
+              example: "user@example.com"
+            firstName:
+              type: string
+              example: "John"
+            lastName:
+              type: string
+              example: "Doe"
+            phone:
+              type: string
+              example: "+15551234567"
+            avatar:
+              type: string
+              example: "https://example.com/avatar.png"
+            isVerified:
+              type: boolean
+              example: true
+            role:
+              type: string
+              example: "user"
+
+    GenericMessage:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Password reset link sent to your email."

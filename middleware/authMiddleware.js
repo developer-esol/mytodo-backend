@@ -1,6 +1,6 @@
 // middleware/authMiddleware.js
 const jwt = require("jsonwebtoken");
-const User = require("../models/User");
+const User = require("../models/user/User");
 exports.protect = async (req, res, next) => {
   try {
     let token;
@@ -19,21 +19,21 @@ exports.protect = async (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log("Decoded token:", decoded);
-    
+
     // Get user and attach to request
     // Support both token formats: { _id: ... } and { user: { id: ... } }
     const userId = decoded._id || decoded.user?.id || decoded.id;
-    
+
     if (!userId) {
       return res.status(401).json({
         success: false,
         error: "Invalid token format",
       });
     }
-    
+
     req.user = await User.findById(userId).select("-password");
     console.log("User found:", req.user);
-    
+
     if (!req.user) {
       return res.status(401).json({
         success: false,
@@ -51,10 +51,10 @@ exports.protect = async (req, res, next) => {
       req.user.avatar = null; // Set to null instead of leaving undefined
     }
     if (req.user.firstName === undefined) {
-      req.user.firstName = '';
+      req.user.firstName = "";
     }
     if (req.user.lastName === undefined) {
-      req.user.lastName = '';
+      req.user.lastName = "";
     }
 
     next();
@@ -120,7 +120,7 @@ exports.authenticateUser = async (req, res, next) => {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      avatar: user.avatar || '',
+      avatar: user.avatar || "",
       role: user.role || "user",
     };
 
@@ -160,7 +160,7 @@ exports.verifyFirebaseToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith("Bearer ")) {
-      return res.status(401).json({error: "Firebase token not provided"});
+      return res.status(401).json({ error: "Firebase token not provided" });
     }
 
     const idToken = authHeader.split(" ")[1];
@@ -169,6 +169,6 @@ exports.verifyFirebaseToken = async (req, res, next) => {
     next();
   } catch (error) {
     console.error("Firebase token verification error:", error);
-    res.status(401).json({error: "Invalid Firebase token"});
+    res.status(401).json({ error: "Invalid Firebase token" });
   }
 };

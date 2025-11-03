@@ -1,12 +1,19 @@
-const Task = require("../models/Task");
-const Offer = require("../models/Offer");
-const TransAction = require("../models/TransActions");
-const Payment = require("../models/Payment");
+const Task = require("../models/task/Task");
+const Offer = require("../models/task/Offer");
+const TransAction = require("../models/payment/TransActions");
+const Payment = require("../models/payment/Payment");
 const mongoose = require("mongoose");
-const { formatUserObject, formatCurrency, formatCurrencyObject } = require('../utils/userUtils');
-const User = require("../models/User");
-const { generateReceiptsForCompletedTask } = require('../services/receiptService');
-const notificationService = require('../services/notificationService');
+const {
+  formatUserObject,
+  formatCurrency,
+  formatCurrencyObject,
+} = require("../utils/userUtils");
+
+const User = require("../models/user/User");
+const {
+  generateReceiptsForCompletedTask,
+} = require("../services/receiptService");
+const notificationService = require("../services/notificationService");
 
 const calculateServiceFee = (amount) => {
   const fee = amount * 0.1; // 10% service fee
@@ -24,11 +31,13 @@ const isValidObjectId = mongoose.Types.ObjectId.isValid;
 exports.getMyTasks = async (req, res) => {
   try {
     const userId = req.user._id;
-    const {section, subsection} = req.query;
+    const { section, subsection } = req.query;
     const now = new Date();
 
     if (!isValidObjectId(userId)) {
-      return res.status(400).json({success: false, message: "Invalid user ID"});
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user ID" });
     }
 
     let query = {};
@@ -39,16 +48,16 @@ exports.getMyTasks = async (req, res) => {
           case "open":
             const offeredTaskIds = await Offer.find({
               taskTakerId: userId,
-              status: {$ne: "rejected"},
+              status: { $ne: "rejected" },
             }).distinct("taskId");
 
             query = {
               $or: [
-                {createdBy: userId, status: "open"},
+                { createdBy: userId, status: "open" },
                 {
-                  _id: {$in: offeredTaskIds},
+                  _id: { $in: offeredTaskIds },
                   status: "open",
-                  createdBy: {$ne: userId},
+                  createdBy: { $ne: userId },
                 },
               ],
             };
@@ -64,17 +73,17 @@ exports.getMyTasks = async (req, res) => {
             query = {
               status: "todo",
               $or: [
-                {createdBy: userId}, // Tasks I created
-                {assignedTo: userId}, // Tasks directly assigned to me
-                {_id: {$in: transactionTaskIds || []}}, // Tasks from transactions
+                { createdBy: userId }, // Tasks I created
+                { assignedTo: userId }, // Tasks directly assigned to me
+                { _id: { $in: transactionTaskIds || [] } }, // Tasks from transactions
               ],
             };
             break;
           case "completed":
             query = {
               $or: [
-                {createdBy: userId, status: "completed"},
-                {assignedTo: userId, status: "completed"},
+                { createdBy: userId, status: "completed" },
+                { assignedTo: userId, status: "completed" },
               ],
             };
             break;
@@ -83,13 +92,13 @@ exports.getMyTasks = async (req, res) => {
             // Keep original all-tasks behavior for other subsections
             const defaultOfferedTaskIds = await Offer.find({
               taskTakerId: userId,
-              status: {$ne: "rejected"},
+              status: { $ne: "rejected" },
             }).distinct("taskId");
 
             query.$or = [
-              {createdBy: userId},
-              {assignedTo: userId},
-              {_id: {$in: defaultOfferedTaskIds || []}},
+              { createdBy: userId },
+              { assignedTo: userId },
+              { _id: { $in: defaultOfferedTaskIds || [] } },
             ];
         }
         break;
@@ -99,8 +108,8 @@ exports.getMyTasks = async (req, res) => {
         if (subsection) {
           if (subsection === "overdue") {
             query.$or = [
-              {status: "open", "dateRange.end": {$lt: now}},
-              {status: "todo", "dateRange.end": {$lt: now}},
+              { status: "open", "dateRange.end": { $lt: now } },
+              { status: "todo", "dateRange.end": { $lt: now } },
             ];
           } else if (subsection === "expired") {
             query.status = "open";
@@ -117,12 +126,12 @@ exports.getMyTasks = async (req, res) => {
         // Get all tasks the user is involved with (doing for others)
         const taskIdsForUser = await TransAction.find({
           taskerId: userId,
-          status: {$in: ["todo", "done", "completed"]},
+          status: { $in: ["todo", "done", "completed"] },
         }).distinct("taskId");
 
         query = {
-          _id: {$in: taskIdsForUser || []},
-          createdBy: {$ne: userId}, // Only others' tasks
+          _id: { $in: taskIdsForUser || [] },
+          createdBy: { $ne: userId }, // Only others' tasks
         };
 
         // Apply subsection filters
@@ -135,9 +144,9 @@ exports.getMyTasks = async (req, res) => {
             }).distinct("taskId");
 
             query = {
-              _id: {$in: offeredTaskIds || []},
+              _id: { $in: offeredTaskIds || [] },
               status: "open",
-              createdBy: {$ne: userId},
+              createdBy: { $ne: userId },
             };
             break;
 
@@ -150,9 +159,9 @@ exports.getMyTasks = async (req, res) => {
             query = {
               status: "todo",
               $or: [
-                {createdBy: userId}, // Tasks I created
-                {assignedTo: userId}, // Tasks directly assigned to me
-                {_id: {$in: transactionTaskIds || []}}, // Tasks from transactions
+                { createdBy: userId }, // Tasks I created
+                { assignedTo: userId }, // Tasks directly assigned to me
+                { _id: { $in: transactionTaskIds || [] } }, // Tasks from transactions
               ],
             };
             break;
@@ -175,22 +184,22 @@ exports.getMyTasks = async (req, res) => {
 
       case "completed-tasks":
         query.$or = [
-          {createdBy: userId, status: "completed"},
-          {assignedTo: userId, status: "completed"},
+          { createdBy: userId, status: "completed" },
+          { assignedTo: userId, status: "completed" },
         ];
         break;
 
       case "overdue-tasks":
         query.$or = [
-          {status: "open", "dateRange.end": {$lt: now}, createdBy: userId},
-          {status: "todo", "dateRange.end": {$lt: now}, assignedTo: userId},
+          { status: "open", "dateRange.end": { $lt: now }, createdBy: userId },
+          { status: "todo", "dateRange.end": { $lt: now }, assignedTo: userId },
         ];
         break;
 
       default:
         return res
           .status(400)
-          .json({success: false, message: "Invalid section"});
+          .json({ success: false, message: "Invalid section" });
     }
 
     // Additional status filtering for non-special cases
@@ -205,135 +214,172 @@ exports.getMyTasks = async (req, res) => {
     const tasks = await Task.find(query)
       .populate("createdBy", "firstName lastName avatar rating")
       .populate("assignedTo", "firstName lastName avatar rating")
-      .sort({"dateRange.end": 1, createdAt: -1})
+      .sort({ "dateRange.end": 1, createdAt: -1 })
       .lean();
 
     // For each task, get the relevant offer information
-    const tasksWithOffers = await Promise.all(tasks.map(async (task) => {
-      let relevantOffer = null;
-      
-      // Find the relevant offer for this task
-      if (section === "posted-tasks") {
-        // For posted tasks, we want to show the TASK BUDGET, not offer amounts
-        // But we can include offer information for reference
-        relevantOffer = await Offer.findOne({
-          taskId: task._id,
-          status: { $in: ["accepted", "pending"] }
-        })
-        .populate("taskTakerId", "firstName lastName avatar rating")
-        .sort({ status: -1, createdAt: -1 }) // Accepted offers first, then by newest
-        .lean();
-      } else {
-        // For other sections (todo-tasks, etc.), get the user's specific offer
-        relevantOffer = await Offer.findOne({
-          taskId: task._id,
-          taskTakerId: userId
-        })
-        .populate("taskTakerId", "firstName lastName avatar rating")
-        .lean();
-      }
+    const tasksWithOffers = await Promise.all(
+      tasks.map(async (task) => {
+        let relevantOffer = null;
 
-      // Create enhanced task object
-      const enhancedTask = {
-        ...task,
-        // Always preserve original task information
-        taskBudget: task.budget,
-        taskCurrency: task.currency,
-        formattedTaskBudget: formatCurrency(task.budget, task.currency),
-        taskCurrencyInfo: formatCurrencyObject(task.budget, task.currency),
-      };
-
-      // Add completion permissions for todo tasks
-      if (task.status === "todo") {
-        const userIdString = userId.toString();
-        const isTaskCreator = task.createdBy && task.createdBy._id.toString() === userIdString;
-        const isAssignedTasker = task.assignedTo && task.assignedTo._id.toString() === userIdString;
-        
-        console.log('Task completion check:', {
-          taskId: task._id,
-          taskStatus: task.status,
-          userIdString,
-          createdBy: task.createdBy?._id.toString(),
-          assignedTo: task.assignedTo?._id.toString(),
-          isTaskCreator,
-          isAssignedTasker
-        });
-        
-        // Only the task CREATOR (poster) can mark the task as complete
-        // The task poster is the one who made the payment and should mark completion
-        enhancedTask.canComplete = isTaskCreator;
-        enhancedTask.completionButtonText = isTaskCreator ? "Mark as Complete" : null;
-        enhancedTask.completionAction = isTaskCreator ? "complete" : null;
-        enhancedTask.userRole = isTaskCreator ? "creator" : (isAssignedTasker ? "assignee" : "none");
-        enhancedTask.showCompleteButton = isTaskCreator; // Only show to task poster
-        enhancedTask.showCancelButton = isTaskCreator; // Only creator can cancel
-      } else {
-        enhancedTask.canComplete = false;
-        enhancedTask.completionButtonText = null;
-        enhancedTask.completionAction = null;
-        enhancedTask.userRole = "none";
-        enhancedTask.showCompleteButton = false;
-        enhancedTask.showCancelButton = false;
-      }
-
-      // Add general action flags that frontend can use
-      enhancedTask.actions = {
-        canComplete: enhancedTask.canComplete, // Only task creator can complete
-        canCancel: enhancedTask.showCancelButton, // Only task creator can cancel
-        canEdit: task.createdBy && task.createdBy._id.toString() === userId.toString() && task.status === "open",
-        canView: true
-      };
-
-      if (section === "posted-tasks") {
-        // For posted tasks, show TASK BUDGET as the main amount
-        enhancedTask.budget = task.budget;
-        enhancedTask.currency = task.currency;
-        enhancedTask.formattedBudget = formatCurrency(task.budget, task.currency);
-        enhancedTask.currencyInfo = formatCurrencyObject(task.budget, task.currency);
-        
-        // Include offer information as additional data (not main display amount)
-        if (relevantOffer) {
-          enhancedTask.acceptedOffer = {
-            _id: relevantOffer._id,
-            amount: relevantOffer.offer.amount,
-            currency: relevantOffer.offer.currency,
-            formattedAmount: formatCurrency(relevantOffer.offer.amount, relevantOffer.offer.currency),
-            message: relevantOffer.offer.message,
-            status: relevantOffer.status,
-            createdAt: relevantOffer.createdAt,
-            tasker: relevantOffer.taskTakerId
-          };
-        }
-      } else {
-        // For tasks where user made offers, show USER'S OFFER AMOUNT as main amount
-        if (relevantOffer) {
-          enhancedTask.budget = relevantOffer.offer.amount;
-          enhancedTask.currency = relevantOffer.offer.currency;
-          enhancedTask.formattedBudget = formatCurrency(relevantOffer.offer.amount, relevantOffer.offer.currency);
-          enhancedTask.currencyInfo = formatCurrencyObject(relevantOffer.offer.amount, relevantOffer.offer.currency);
-          
-          enhancedTask.userOffer = {
-            _id: relevantOffer._id,
-            amount: relevantOffer.offer.amount,
-            currency: relevantOffer.offer.currency,
-            formattedAmount: formatCurrency(relevantOffer.offer.amount, relevantOffer.offer.currency),
-            message: relevantOffer.offer.message,
-            status: relevantOffer.status,
-            createdAt: relevantOffer.createdAt
-          };
+        // Find the relevant offer for this task
+        if (section === "posted-tasks") {
+          // For posted tasks, we want to show the TASK BUDGET, not offer amounts
+          // But we can include offer information for reference
+          relevantOffer = await Offer.findOne({
+            taskId: task._id,
+            status: { $in: ["accepted", "pending"] },
+          })
+            .populate("taskTakerId", "firstName lastName avatar rating")
+            .sort({ status: -1, createdAt: -1 }) // Accepted offers first, then by newest
+            .lean();
         } else {
-          // If no offer found, show task budget as fallback
+          // For other sections (todo-tasks, etc.), get the user's specific offer
+          relevantOffer = await Offer.findOne({
+            taskId: task._id,
+            taskTakerId: userId,
+          })
+            .populate("taskTakerId", "firstName lastName avatar rating")
+            .lean();
+        }
+
+        // Create enhanced task object
+        const enhancedTask = {
+          ...task,
+          // Always preserve original task information
+          taskBudget: task.budget,
+          taskCurrency: task.currency,
+          formattedTaskBudget: formatCurrency(task.budget, task.currency),
+          taskCurrencyInfo: formatCurrencyObject(task.budget, task.currency),
+        };
+
+        // Add completion permissions for todo tasks
+        if (task.status === "todo") {
+          const userIdString = userId.toString();
+          const isTaskCreator =
+            task.createdBy && task.createdBy._id.toString() === userIdString;
+          const isAssignedTasker =
+            task.assignedTo && task.assignedTo._id.toString() === userIdString;
+
+          console.log("Task completion check:", {
+            taskId: task._id,
+            taskStatus: task.status,
+            userIdString,
+            createdBy: task.createdBy?._id.toString(),
+            assignedTo: task.assignedTo?._id.toString(),
+            isTaskCreator,
+            isAssignedTasker,
+          });
+
+          // Only the task CREATOR (poster) can mark the task as complete
+          // The task poster is the one who made the payment and should mark completion
+          enhancedTask.canComplete = isTaskCreator;
+          enhancedTask.completionButtonText = isTaskCreator
+            ? "Mark as Complete"
+            : null;
+          enhancedTask.completionAction = isTaskCreator ? "complete" : null;
+          enhancedTask.userRole = isTaskCreator
+            ? "creator"
+            : isAssignedTasker
+            ? "assignee"
+            : "none";
+          enhancedTask.showCompleteButton = isTaskCreator; // Only show to task poster
+          enhancedTask.showCancelButton = isTaskCreator; // Only creator can cancel
+        } else {
+          enhancedTask.canComplete = false;
+          enhancedTask.completionButtonText = null;
+          enhancedTask.completionAction = null;
+          enhancedTask.userRole = "none";
+          enhancedTask.showCompleteButton = false;
+          enhancedTask.showCancelButton = false;
+        }
+
+        // Add general action flags that frontend can use
+        enhancedTask.actions = {
+          canComplete: enhancedTask.canComplete, // Only task creator can complete
+          canCancel: enhancedTask.showCancelButton, // Only task creator can cancel
+          canEdit:
+            task.createdBy &&
+            task.createdBy._id.toString() === userId.toString() &&
+            task.status === "open",
+          canView: true,
+        };
+
+        if (section === "posted-tasks") {
+          // For posted tasks, show TASK BUDGET as the main amount
           enhancedTask.budget = task.budget;
           enhancedTask.currency = task.currency;
-          enhancedTask.formattedBudget = formatCurrency(task.budget, task.currency);
-          enhancedTask.currencyInfo = formatCurrencyObject(task.budget, task.currency);
+          enhancedTask.formattedBudget = formatCurrency(
+            task.budget,
+            task.currency
+          );
+          enhancedTask.currencyInfo = formatCurrencyObject(
+            task.budget,
+            task.currency
+          );
+
+          // Include offer information as additional data (not main display amount)
+          if (relevantOffer) {
+            enhancedTask.acceptedOffer = {
+              _id: relevantOffer._id,
+              amount: relevantOffer.offer.amount,
+              currency: relevantOffer.offer.currency,
+              formattedAmount: formatCurrency(
+                relevantOffer.offer.amount,
+                relevantOffer.offer.currency
+              ),
+              message: relevantOffer.offer.message,
+              status: relevantOffer.status,
+              createdAt: relevantOffer.createdAt,
+              tasker: relevantOffer.taskTakerId,
+            };
+          }
+        } else {
+          // For tasks where user made offers, show USER'S OFFER AMOUNT as main amount
+          if (relevantOffer) {
+            enhancedTask.budget = relevantOffer.offer.amount;
+            enhancedTask.currency = relevantOffer.offer.currency;
+            enhancedTask.formattedBudget = formatCurrency(
+              relevantOffer.offer.amount,
+              relevantOffer.offer.currency
+            );
+            enhancedTask.currencyInfo = formatCurrencyObject(
+              relevantOffer.offer.amount,
+              relevantOffer.offer.currency
+            );
+
+            enhancedTask.userOffer = {
+              _id: relevantOffer._id,
+              amount: relevantOffer.offer.amount,
+              currency: relevantOffer.offer.currency,
+              formattedAmount: formatCurrency(
+                relevantOffer.offer.amount,
+                relevantOffer.offer.currency
+              ),
+              message: relevantOffer.offer.message,
+              status: relevantOffer.status,
+              createdAt: relevantOffer.createdAt,
+            };
+          } else {
+            // If no offer found, show task budget as fallback
+            enhancedTask.budget = task.budget;
+            enhancedTask.currency = task.currency;
+            enhancedTask.formattedBudget = formatCurrency(
+              task.budget,
+              task.currency
+            );
+            enhancedTask.currencyInfo = formatCurrencyObject(
+              task.budget,
+              task.currency
+            );
+          }
         }
-      }
 
-      return enhancedTask;
-    }));
+        return enhancedTask;
+      })
+    );
 
-    res.status(200).json({success: true, data: tasksWithOffers});
+    res.status(200).json({ success: true, data: tasksWithOffers });
   } catch (error) {
     console.error("Error fetching tasks:", error);
     res.status(500).json({
@@ -346,17 +392,17 @@ exports.getMyTasks = async (req, res) => {
 
 exports.updateTaskStatus = async (req, res) => {
   try {
-    const {taskId} = req.params;
-    const {newStatus} = req.body;
+    const { taskId } = req.params;
+    const { newStatus } = req.body;
     const userId = req.user._id;
 
     if (!isValidObjectId(taskId)) {
-      return res.status(400).json({success: false, error: "Invalid task ID"});
+      return res.status(400).json({ success: false, error: "Invalid task ID" });
     }
 
     const task = await Task.findById(taskId);
     if (!task) {
-      return res.status(404).json({success: false, error: "Task not found"});
+      return res.status(404).json({ success: false, error: "Task not found" });
     }
 
     // Enhanced status transition validation
@@ -412,10 +458,13 @@ exports.updateTaskStatus = async (req, res) => {
         // Update related offer and transaction
         await Promise.all([
           Offer.findOneAndUpdate(
-            {taskId, status: "accepted"},
-            {status: "completed", completedAt: new Date()}
+            { taskId, status: "accepted" },
+            { status: "completed", completedAt: new Date() }
           ),
-          TransAction.updateMany({taskId}, {$set: {taskStatus: "completed"}}),
+          TransAction.updateMany(
+            { taskId },
+            { $set: { taskStatus: "completed" } }
+          ),
         ]);
         break;
 
@@ -443,10 +492,13 @@ exports.updateTaskStatus = async (req, res) => {
     // Sync with transaction table (corrected case sensitivity)
     if (newStatus !== "completed") {
       // Already handled above for completed
-      await TransAction.updateMany({taskId}, {$set: {taskStatus: newStatus}});
+      await TransAction.updateMany(
+        { taskId },
+        { $set: { taskStatus: newStatus } }
+      );
     }
 
-    res.status(200).json({success: true, data: task});
+    res.status(200).json({ success: true, data: task });
   } catch (error) {
     console.error("Error updating task status:", error);
     res.status(500).json({
@@ -459,14 +511,16 @@ exports.updateTaskStatus = async (req, res) => {
 exports.getMyOffers = async (req, res) => {
   try {
     const userId = req.user._id;
-    const {status} = req.query;
+    const { status } = req.query;
 
     // Validate user ID
     if (!isValidObjectId(userId)) {
-      return res.status(400).json({success: false, message: "Invalid user ID"});
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user ID" });
     }
 
-    let query = {taskTakerId: userId};
+    let query = { taskTakerId: userId };
     if (status) {
       query.status = status;
     }
@@ -474,9 +528,9 @@ exports.getMyOffers = async (req, res) => {
     const offers = await Offer.find(query)
       .populate("taskId", "title budget dateRange status")
       .populate("taskCreatorId", "firstName lastName avatar rating")
-      .sort({createdAt: -1});
+      .sort({ createdAt: -1 });
 
-    res.status(200).json({success: true, data: offers});
+    res.status(200).json({ success: true, data: offers });
   } catch (error) {
     console.error("Error fetching offers:", error);
     res.status(500).json({
@@ -487,11 +541,11 @@ exports.getMyOffers = async (req, res) => {
   }
 };
 
-const { calculateVotes } = require('../utils/taskStatus.utils');
+const { calculateVotes } = require("../utils/taskStatus.utils");
 
 exports.completeTask = async (req, res) => {
   try {
-    const {taskId} = req.params;
+    const { taskId } = req.params;
     const userId = req.user._id;
 
     // Validate task ID
@@ -507,10 +561,13 @@ exports.completeTask = async (req, res) => {
       _id: taskId,
       status: "todo", // Only todo tasks can be completed
       $or: [
-        {createdBy: userId}, // Task creator can complete
-        {assignedTo: userId}, // Assigned tasker can complete
+        { createdBy: userId }, // Task creator can complete
+        { assignedTo: userId }, // Assigned tasker can complete
       ],
-    }).populate("createdBy assignedTo", "firstName lastName avatar rating completedTasks");
+    }).populate(
+      "createdBy assignedTo",
+      "firstName lastName avatar rating completedTasks"
+    );
 
     if (!task) {
       return res.status(404).json({
@@ -522,18 +579,21 @@ exports.completeTask = async (req, res) => {
     // Find the accepted offer for this task
     const acceptedOffer = await Offer.findOne({
       taskId: taskId,
-      status: "accepted"
+      status: "accepted",
     });
 
     if (!acceptedOffer) {
       return res.status(404).json({
         success: false,
-        message: "No accepted offer found for this task"
+        message: "No accepted offer found for this task",
       });
     }
 
     // Calculate votes based on task budget and offer amount
-    const { posterVotes, taskerVotes } = calculateVotes(task.budget, acceptedOffer.offer.amount);
+    const { posterVotes, taskerVotes } = calculateVotes(
+      task.budget,
+      acceptedOffer.offer.amount
+    );
 
     // Update task status
     task.status = "completed";
@@ -541,21 +601,23 @@ exports.completeTask = async (req, res) => {
     await task.save();
 
     // CRITICAL: Update payment status FIRST before generating receipts
-    console.log(`💳 Updating payment status to completed for task ${taskId}...`);
+    console.log(
+      `💳 Updating payment status to completed for task ${taskId}...`
+    );
     await Payment.updateMany(
-      {task: taskId}, 
-      {$set: {status: "completed", updatedAt: new Date()}}
+      { task: taskId },
+      { $set: { status: "completed", updatedAt: new Date() } }
     );
     console.log(`✅ Payment status updated to completed`);
 
     // Update task poster's vote count
     await User.findByIdAndUpdate(task.createdBy._id, {
-      $inc: { completedTasks: posterVotes }
+      $inc: { completedTasks: posterVotes },
     });
 
     // Update tasker's vote count
     await User.findByIdAndUpdate(task.assignedTo._id, {
-      $inc: { completedTasks: taskerVotes }
+      $inc: { completedTasks: taskerVotes },
     });
 
     // Update offer status
@@ -569,42 +631,58 @@ exports.completeTask = async (req, res) => {
           status: "completed",
           completedAt: new Date(),
           posterVotes,
-          taskerVotes
+          taskerVotes,
         },
       }
     );
 
     // Generate receipts for both poster and tasker when task is completed
     try {
-      console.log(`🔄 Attempting to generate receipts for completed task ${taskId}...`);
+      console.log(
+        `🔄 Attempting to generate receipts for completed task ${taskId}...`
+      );
       const receipts = await generateReceiptsForCompletedTask(taskId);
       console.log(`✅ Receipts successfully generated for task ${taskId}:`, {
         paymentReceipt: receipts.paymentReceipt.receiptNumber,
-        earningsReceipt: receipts.earningsReceipt.receiptNumber
+        earningsReceipt: receipts.earningsReceipt.receiptNumber,
       });
-      
+
       // Send receipt ready notifications
       if (receipts.paymentReceipt) {
         try {
           const poster = await User.findById(task.createdBy._id);
-          await notificationService.notifyReceiptReady(receipts.paymentReceipt, task, poster);
+          await notificationService.notifyReceiptReady(
+            receipts.paymentReceipt,
+            task,
+            poster
+          );
         } catch (notifError) {
-          console.error("Error sending poster receipt notification:", notifError);
+          console.error(
+            "Error sending poster receipt notification:",
+            notifError
+          );
         }
       }
-      
+
       if (receipts.earningsReceipt) {
         try {
           const tasker = await User.findById(task.assignedTo._id);
-          await notificationService.notifyReceiptReady(receipts.earningsReceipt, task, tasker);
+          await notificationService.notifyReceiptReady(
+            receipts.earningsReceipt,
+            task,
+            tasker
+          );
         } catch (notifError) {
-          console.error("Error sending tasker receipt notification:", notifError);
+          console.error(
+            "Error sending tasker receipt notification:",
+            notifError
+          );
         }
       }
     } catch (receiptError) {
       console.error(`❌ Failed to generate receipts for task ${taskId}:`, {
         error: receiptError.message,
-        stack: receiptError.stack
+        stack: receiptError.stack,
       });
       // Don't fail the task completion if receipt generation fails
       // Receipts can be generated later via the API
@@ -626,7 +704,7 @@ exports.completeTask = async (req, res) => {
 
 exports.checkTaskCompletionStatus = async (req, res) => {
   try {
-    const {taskId} = req.params;
+    const { taskId } = req.params;
     const userId = req.user._id;
 
     if (!isValidObjectId(taskId)) {
@@ -636,8 +714,11 @@ exports.checkTaskCompletionStatus = async (req, res) => {
       });
     }
 
-    const task = await Task.findById(taskId).populate("createdBy assignedTo", "firstName lastName");
-    
+    const task = await Task.findById(taskId).populate(
+      "createdBy assignedTo",
+      "firstName lastName"
+    );
+
     if (!task) {
       return res.status(404).json({
         success: false,
@@ -645,13 +726,15 @@ exports.checkTaskCompletionStatus = async (req, res) => {
       });
     }
 
-    const isTaskCreator = task.createdBy && task.createdBy._id.toString() === userId.toString();
-    const isAssignedTasker = task.assignedTo && task.assignedTo._id.toString() === userId.toString();
-    
+    const isTaskCreator =
+      task.createdBy && task.createdBy._id.toString() === userId.toString();
+    const isAssignedTasker =
+      task.assignedTo && task.assignedTo._id.toString() === userId.toString();
+
     // Only the task CREATOR (poster) can mark the task as complete
     // The task poster is the one who made the payment and should mark completion
     const canComplete = task.status === "todo" && isTaskCreator;
-    
+
     res.status(200).json({
       success: true,
       data: {
@@ -659,8 +742,12 @@ exports.checkTaskCompletionStatus = async (req, res) => {
         status: task.status,
         canComplete: canComplete,
         completionButtonText: canComplete ? "Mark as Complete" : null,
-        userRole: isTaskCreator ? "creator" : (isAssignedTasker ? "assignee" : "none")
-      }
+        userRole: isTaskCreator
+          ? "creator"
+          : isAssignedTasker
+          ? "assignee"
+          : "none",
+      },
     });
   } catch (error) {
     console.error("Error checking task completion status:", error);
@@ -673,7 +760,7 @@ exports.checkTaskCompletionStatus = async (req, res) => {
 
 exports.cancelTask = async (req, res) => {
   try {
-    const {taskId} = req.params;
+    const { taskId } = req.params;
     const userId = req.user._id;
 
     // Validate task ID
@@ -688,7 +775,7 @@ exports.cancelTask = async (req, res) => {
     const task = await Task.findOne({
       _id: taskId,
       createdBy: userId, // Only task creator can cancel
-      status: {$in: ["open", "todo"]}, // Can cancel open or todo tasks
+      status: { $in: ["open", "todo"] }, // Can cancel open or todo tasks
     }).populate("createdBy assignedTo", "firstName lastName avatar rating");
 
     if (!task) {
@@ -707,7 +794,7 @@ exports.cancelTask = async (req, res) => {
     await Offer.updateMany(
       {
         taskId: taskId,
-        status: {$in: ["pending", "accepted"]},
+        status: { $in: ["pending", "accepted"] },
       },
       {
         $set: {
@@ -733,8 +820,8 @@ exports.cancelTask = async (req, res) => {
 
 exports.acceptOffer = async (req, res) => {
   try {
-    const {taskId, offerId} = req.params;
-    const {role} = req.body;
+    const { taskId, offerId } = req.params;
+    const { role } = req.body;
 
     // Validate inputs
     if (!taskId || !offerId) {
@@ -836,7 +923,7 @@ exports.acceptOffer = async (req, res) => {
     await Offer.updateMany(
       {
         taskId: task._id,
-        _id: {$ne: offer._id},
+        _id: { $ne: offer._id },
         status: "pending",
       },
       {
@@ -902,14 +989,14 @@ exports.getTaskWithOffers = async (req, res) => {
     // Get all offers with populated user details
     const offers = await Offer.find({
       taskId: taskId,
-      status: {$ne: "withdrawn"}, // Only exclude withdrawn offers
+      status: { $ne: "withdrawn" }, // Only exclude withdrawn offers
     })
       .populate({
         path: "taskTakerId",
         select: "firstName lastName avatar rating completedTasks name",
         model: "User",
       })
-      .sort({createdAt: -1}) // Sort by newest first
+      .sort({ createdAt: -1 }) // Sort by newest first
       .lean();
 
     // Format all offers
@@ -930,7 +1017,10 @@ exports.getTaskWithOffers = async (req, res) => {
       amount: offer.offer.amount,
       currency: offer.offer.currency,
       formattedAmount: formatCurrency(offer.offer.amount, offer.offer.currency),
-      currencyInfo: formatCurrencyObject(offer.offer.amount, offer.offer.currency),
+      currencyInfo: formatCurrencyObject(
+        offer.offer.amount,
+        offer.offer.currency
+      ),
       message: offer.offer.message,
       status: offer.status,
       createdAt: offer.createdAt,

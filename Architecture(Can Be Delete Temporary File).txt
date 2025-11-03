@@ -1,0 +1,416 @@
+mytodo-backend/
+│
+├── 📁 config/                          # Configuration files
+│   ├── app.config.js                   # App-wide configuration
+│   ├── database.config.js              # MongoDB connection
+│   ├── redis.config.js                 # Redis cache (if needed)
+│   ├── aws.config.js                   # AWS S3 configuration
+│   ├── stripe.config.js                # Stripe payment config
+│   ├── firebase.config.js              # Firebase admin SDK
+│   ├── twilio.config.js                # Twilio SMS config
+│   ├── email.config.js                 # Email/Nodemailer config
+│   └── index.js                        # Export all configs
+│
+├── 📁 controllers/                     # Request handlers
+│   │
+│   ├── 📁 auth/
+│   │   ├── auth.controller.js          # Login, register, logout
+│   │   ├── password.controller.js      # Reset, forgot password
+│   │   ├── verification.controller.js  # Email/phone verification
+│   │   └── oauth.controller.js         # Google OAuth
+│   │
+│   ├── 📁 users/
+│   │   ├── user.controller.js          # User CRUD
+│   │   ├── profile.controller.js       # Profile management
+│   │   ├── preferences.controller.js   # User preferences
+│   │   └── activity.controller.js      # User activity logs
+│   │
+│   ├── 📁 tasks/
+│   │   ├── task.controller.js          # Task CRUD
+│   │   ├── taskOffer.controller.js     # Task offers/bids
+│   │   ├── taskAssignment.controller.js # Task assignment
+│   │   ├── taskCompletion.controller.js # Task completion
+│   │   └── taskSearch.controller.js    # Task search/filter
+│   │
+│   ├── 📁 categories/
+│   │   ├── category.controller.js      # Category CRUD
+│   │   ├── subcategory.controller.js   # Subcategory management
+│   │   └── categoryStats.controller.js # Category statistics
+│   │
+│   ├── 📁 payments/
+│   │   ├── payment.controller.js       # Payment processing
+│   │   ├── stripe.controller.js        # Stripe integration
+│   │   ├── webhook.controller.js       # Stripe webhooks
+│   │   ├── refund.controller.js        # Refund handling
+│   │   └── invoice.controller.js       # Invoice generation
+│   │
+│   ├── 📁 chat/
+│   │   ├── conversation.controller.js  # Conversations
+│   │   ├── message.controller.js       # Messages
+│   │   └── attachment.controller.js    # File attachments
+│   │
+│   ├── 📁 notifications/
+│   │   ├── notification.controller.js  # Notification CRUD
+│   │   ├── push.controller.js          # Push notifications
+│   │   ├── email.controller.js         # Email notifications
+│   │   └── sms.controller.js           # SMS notifications
+│   │
+│   ├── 📁 reviews/
+│   │   ├── review.controller.js        # Review CRUD
+│   │   ├── rating.controller.js        # Rating management
+│   │   └── reviewStats.controller.js   # Review statistics
+│   │
+│   ├── 📁 uploads/
+│   │   ├── upload.controller.js        # File upload handler
+│   │   ├── image.controller.js         # Image processing
+│   │   └── document.controller.js      # Document handling
+│   │
+│   └── 📁 admin/
+│       ├── adminAuth.controller.js     # Admin login/logout
+│       ├── dashboard.controller.js     # Dashboard stats
+│       ├── userManagement.controller.js # User management
+│       ├── taskManagement.controller.js # Task management
+│       ├── analytics.controller.js     # Analytics/reports
+│       ├── commission.controller.js    # Commission settings
+│       ├── systemSettings.controller.js # System settings
+│       └── auditLogs.controller.js     # Audit logs
+│
+├── 📁 services/                        # Business logic layer
+│   │
+│   ├── 📁 auth/
+│   │   ├── auth.service.js             # Authentication logic
+│   │   ├── jwt.service.js              # JWT token handling
+│   │   ├── password.service.js         # Password hashing/validation
+│   │   ├── verification.service.js     # Email/SMS verification
+│   │   └── oauth.service.js            # OAuth integration
+│   │
+│   ├── 📁 users/
+│   │   ├── user.service.js             # User business logic
+│   │   ├── profile.service.js          # Profile management
+│   │   └── activity.service.js         # Activity tracking
+│   │
+│   ├── 📁 tasks/
+│   │   ├── task.service.js             # Task business logic
+│   │   ├── taskOffer.service.js        # Offer management
+│   │   ├── taskMatching.service.js     # Task matching algorithm
+│   │   ├── taskNotification.service.js # Task notifications
+│   │   └── taskValidation.service.js   # Task validation rules
+│   │
+│   ├── 📁 categories/
+│   │   ├── category.service.js         # Category logic
+│   │   └── categoryCache.service.js    # Category caching
+│   │
+│   ├── 📁 payments/
+│   │   ├── payment.service.js          # Payment processing
+│   │   ├── stripe.service.js           # Stripe API calls
+│   │   ├── commission.service.js       # Commission calculation
+│   │   ├── escrow.service.js           # Escrow management
+│   │   └── refund.service.js           # Refund processing
+│   │
+│   ├── 📁 chat/
+│   │   ├── chat.service.js             # Chat business logic
+│   │   ├── socket.service.js           # Socket.io handling
+│   │   └── messageQueue.service.js     # Message queuing
+│   │
+│   ├── 📁 notifications/
+│   │   ├── notification.service.js     # Notification logic
+│   │   ├── fcm.service.js              # Firebase Cloud Messaging
+│   │   ├── email.service.js            # Email sending (Nodemailer)
+│   │   ├── sms.service.js              # Twilio SMS
+│   │   └── template.service.js         # Notification templates
+│   │
+│   ├── 📁 reviews/
+│   │   ├── review.service.js           # Review logic
+│   │   ├── rating.service.js           # Rating calculations
+│   │   └── reviewModeration.service.js # Review moderation
+│   │
+│   ├── 📁 uploads/
+│   │   ├── upload.service.js           # Upload logic
+│   │   ├── s3.service.js               # AWS S3 operations
+│   │   ├── imageProcessing.service.js  # Image optimization
+│   │   └── fileValidation.service.js   # File validation
+│   │
+│   └── 📁 admin/
+│       ├── dashboard.service.js        # Dashboard data
+│       ├── analytics.service.js        # Analytics calculations
+│       ├── userManagement.service.js   # User management logic
+│       ├── taskManagement.service.js   # Task management logic
+│       └── reporting.service.js        # Report generation
+│
+├── 📁 repositories/                    # Database queries (Data access layer)
+│   │
+│   ├── 📁 user/
+│   │   ├── user.repository.js          # User queries
+│   │   ├── profile.repository.js       # Profile queries
+│   │   └── userStats.repository.js     # User statistics
+│   │
+│   ├── 📁 task/
+│   │   ├── task.repository.js          # Task queries
+│   │   ├── taskOffer.repository.js     # Offer queries
+│   │   ├── taskSearch.repository.js    # Search queries
+│   │   └── taskStats.repository.js     # Task statistics
+│   │
+│   ├── 📁 category/
+│   │   └── category.repository.js      # Category queries
+│   │
+│   ├── 📁 payment/
+│   │   ├── payment.repository.js       # Payment queries
+│   │   ├── transaction.repository.js   # Transaction queries
+│   │   └── paymentStats.repository.js  # Payment statistics
+│   │
+│   ├── 📁 chat/
+│   │   ├── conversation.repository.js  # Conversation queries
+│   │   └── message.repository.js       # Message queries
+│   │
+│   ├── 📁 notification/
+│   │   └── notification.repository.js  # Notification queries
+│   │
+│   └── 📁 review/
+│       └── review.repository.js        # Review queries
+│
+├── 📁 models/                          # Database schemas ----------------------------------------------------------------------
+│   │
+│   ├── 📁 user/
+│   │   ├── User.js                     # User schema
+│   │   ├── UserProfile.js              # Profile schema
+│   │   ├── UserPreferences.js          # Preferences schema
+│   │   └── UserActivity.js             # Activity log schema
+│   │
+│   ├── 📁 task/
+│   │   ├── Task.js                     # Task schema
+│   │   ├── TaskOffer.js                # Task offer schema
+│   │   ├── TaskAssignment.js           # Assignment schema
+│   │   └── TaskHistory.js              # Task history schema
+│   │
+│   ├── 📁 category/
+│   │   ├── Category.js                 # Category schema
+│   │   └── Subcategory.js              # Subcategory schema
+│   │
+│   ├── 📁 payment/
+│   │   ├── Payment.js                  # Payment schema
+│   │   ├── Transaction.js              # Transaction schema
+│   │   ├── Invoice.js                  # Invoice schema
+│   │   └── Commission.js               # Commission schema
+│   │
+│   ├── 📁 chat/
+│   │   ├── Conversation.js             # Conversation schema
+│   │   └── Message.js                  # Message schema
+│   │
+│   ├── 📁 notification/
+│   │   └── Notification.js             # Notification schema
+│   │
+│   ├── 📁 review/
+│   │   └── Review.js                   # Review schema
+│   │
+│   └── 📁 admin/
+│       ├── AdminSettings.js            # Admin settings schema
+│       ├── AuditLog.js                 # Audit log schema
+│       └── SystemConfig.js             # System config schema
+│
+├── 📁 routes/                          # API routes
+│   │
+│   ├── 📁 v1/                          # API version 1
+│   │   │
+│   │   ├── 📁 auth/
+│   │   │   ├── auth.routes.js          # Auth routes
+│   │   │   ├── password.routes.js      # Password routes
+│   │   │   └── oauth.routes.js         # OAuth routes
+│   │   │
+│   │   ├── 📁 users/
+│   │   │   ├── user.routes.js          # User routes
+│   │   │   ├── profile.routes.js       # Profile routes
+│   │   │   └── preferences.routes.js   # Preferences routes
+│   │   │
+│   │   ├── 📁 tasks/
+│   │   │   ├── task.routes.js          # Task routes
+│   │   │   ├── taskOffer.routes.js     # Offer routes
+│   │   │   └── taskSearch.routes.js    # Search routes
+│   │   │
+│   │   ├── 📁 categories/
+│   │   │   └── category.routes.js      # Category routes
+│   │   │
+│   │   ├── 📁 payments/
+│   │   │   ├── payment.routes.js       # Payment routes
+│   │   │   ├── webhook.routes.js       # Webhook routes
+│   │   │   └── invoice.routes.js       # Invoice routes
+│   │   │
+│   │   ├── 📁 chat/
+│   │   │   └── chat.routes.js          # Chat routes
+│   │   │
+│   │   ├── 📁 notifications/
+│   │   │   └── notification.routes.js  # Notification routes
+│   │   │
+│   │   ├── 📁 reviews/
+│   │   │   └── review.routes.js        # Review routes
+│   │   │
+│   │   ├── 📁 uploads/
+│   │   │   └── upload.routes.js        # Upload routes
+│   │   │
+│   │   └── index.js                    # Route aggregator
+│   │
+│   ├── 📁 admin/                       # Admin routes (separate from v1)
+│   │   ├── adminAuth.routes.js         # Admin auth
+│   │   ├── dashboard.routes.js         # Dashboard
+│   │   ├── users.routes.js             # User management
+│   │   ├── tasks.routes.js             # Task management
+│   │   ├── analytics.routes.js         # Analytics
+│   │   ├── commission.routes.js        # Commission
+│   │   ├── settings.routes.js          # Settings
+│   │   ├── auditLogs.routes.routes.js  # Audit logs
+│   │   └── index.js                    # Admin route aggregator
+│   │
+│   └── index.js                        # Main route aggregator
+│
+├── 📁 middleware/                      # Middleware functions
+│   │
+│   ├── 📁 auth/
+│   │   ├── auth.middleware.js          # User authentication
+│   │   ├── adminAuth.middleware.js     # Admin authentication
+│   │   ├── roleCheck.middleware.js     # Role-based access
+│   │   └── tokenRefresh.middleware.js  # Token refresh
+│   │
+│   ├── 📁 validation/
+│   │   ├── auth.validation.js          # Auth validation
+│   │   ├── task.validation.js          # Task validation
+│   │   ├── user.validation.js          # User validation
+│   │   ├── payment.validation.js       # Payment validation
+│   │   └── common.validation.js        # Common validators
+│   │
+│   ├── 📁 upload/
+│   │   ├── multer.middleware.js        # Multer config
+│   │   ├── fileFilter.middleware.js    # File type filter
+│   │   └── fileSize.middleware.js      # File size limit
+│   │
+│   ├── 📁 security/
+│   │   ├── rateLimiter.middleware.js   # Rate limiting
+│   │   ├── cors.middleware.js          # CORS config
+│   │   ├── helmet.middleware.js        # Security headers
+│   │   └── sanitize.middleware.js      # Input sanitization
+│   │
+│   ├── 📁 logging/
+│   │   ├── requestLogger.middleware.js # Request logging
+│   │   ├── errorLogger.middleware.js   # Error logging
+│   │   └── auditLogger.middleware.js   # Audit logging
+│   │
+│   └── 📁 error/
+│       ├── errorHandler.middleware.js  # Global error handler
+│       ├── notFound.middleware.js      # 404 handler
+│       └── asyncHandler.middleware.js  # Async error wrapper
+│
+├── 📁 utils/                           # Utility functions
+│   │
+│   ├── 📁 helpers/
+│   │   ├── response.helper.js          # Response formatter
+│   │   ├── pagination.helper.js        # Pagination helper
+│   │   ├── date.helper.js              # Date utilities
+│   │   ├── string.helper.js            # String utilities
+│   │   └── validation.helper.js        # Validation helpers
+│   │
+│   ├── 📁 crypto/
+│   │   ├── encryption.util.js          # Encryption/decryption
+│   │   ├── hashing.util.js             # Password hashing
+│   │   └── token.util.js               # Token generation
+│   │
+│   ├── 📁 email/
+│   │   ├── emailSender.util.js         # Email sender
+│   │   ├── emailTemplates.util.js      # Email templates
+│   │   └── emailQueue.util.js          # Email queue
+│   │
+│   ├── 📁 logging/
+│   │   ├── logger.js                   # Winston logger
+│   │   ├── auditLogger.js              # Audit logger
+│   │   └── errorLogger.js              # Error logger
+│   │
+│   ├── 📁 constants/
+│   │   ├── roles.constant.js           # User roles
+│   │   ├── status.constant.js          # Status codes
+│   │   ├── errors.constant.js          # Error messages
+│   │   └── config.constant.js          # Config constants
+│   │
+│   └── 📁 validators/
+│       ├── email.validator.js          # Email validation
+│       ├── phone.validator.js          # Phone validation
+│       └── custom.validator.js         # Custom validators
+│
+├── 📁 jobs/                            # Background jobs
+│   ├── 📁 email/
+│   │   ├── emailQueue.job.js           # Email queue worker
+│   │   └── emailScheduler.job.js       # Scheduled emails
+│   │
+│   ├── 📁 notifications/
+│   │   ├── pushNotification.job.js     # Push notifications
+│   │   └── reminderNotification.job.js # Reminder notifications
+│   │
+│   ├── 📁 tasks/
+│   │   ├── taskExpiry.job.js           # Task expiry check
+│   │   ├── taskReminder.job.js         # Task reminders
+│   │   └── taskCleanup.job.js          # Cleanup old tasks
+│   │
+│   └── 📁 payments/
+│       ├── paymentProcessing.job.js    # Process pending payments
+│       └── invoiceGeneration.job.js    # Generate invoices
+│
+├── 📁 events/                          # Event handlers
+│   ├── 📁 task/
+│   │   ├── taskCreated.event.js        # Task created event
+│   │   ├── taskCompleted.event.js      # Task completed event
+│   │   └── taskCancelled.event.js      # Task cancelled event
+│   │
+│   ├── 📁 payment/
+│   │   ├── paymentSuccess.event.js     # Payment success event
+│   │   └── paymentFailed.event.js      # Payment failed event
+│   │
+│   └── eventEmitter.js                 # Event emitter config
+│
+├── 📁 tests/                           # Test files
+│   ├── 📁 unit/
+│   │   ├── 📁 services/
+│   │   ├── 📁 repositories/
+│   │   └── 📁 utils/
+│   │
+│   ├── 📁 integration/
+│   │   ├── 📁 auth/
+│   │   ├── 📁 tasks/
+│   │   └── 📁 payments/
+│   │
+│   └── 📁 e2e/
+│       └── api.test.js
+│
+├── 📁 docs/                            # Documentation
+│   ├── 📁 swagger/
+│   │   ├── auth.swagger.js             # Auth API docs
+│   │   ├── tasks.swagger.js            # Tasks API docs
+│   │   ├── admin.swagger.js            # Admin API docs
+│   │   └── schemas.swagger.js          # Shared schemas
+│   │
+│   ├── API.md                          # API documentation
+│   ├── SETUP.md                        # Setup guide
+│   └── ARCHITECTURE.md                 # Architecture docs
+│
+├── 📁 scripts/                         # Utility scripts
+│   ├── createAdmin.js                  # Create admin user
+│   ├── seedCategories.js               # Seed categories
+│   ├── migrateData.js                  # Data migration
+│   └── cleanup.js                      # Cleanup script
+│
+├── 📁 public/                          # Static files
+│   ├── 📁 images/
+│   ├── 📁 icons/
+│   └── 📁 documents/
+│
+├── 📁 uploads/                         # Temporary uploads
+│   ├── 📁 images/
+│   ├── 📁 documents/
+│   └── 📁 temp/
+│
+├── 📁 logs/                            # Application logs
+│   ├── error.log
+│   ├── combined.log
+│   └── audit.log
+│
+├── app.js                              # Express app setup
+├── server.js                           # Server entry point
+├── .env                                # Environment variables
+├── .gitignore                          # Git ignore
+├── package.json                        # Dependencies
+└── README.md                           # Project readme

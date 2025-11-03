@@ -1,0 +1,624 @@
+openapi: 3.0.0
+info:
+  title: MyToDoo Notifications API
+  version: 1.0.0
+  description: Real-time notification management for MyToDoo
+
+servers:
+  - url: /api/v1/notifications
+    description: Notifications API base path
+
+tags:
+  - name: Notifications
+    description: Real-time notification management for MyToDoo
+
+paths:
+  /notifications/:
+    get:
+      summary: Get user notifications with pagination
+      tags:
+        - Notifications
+      security:
+        - FirebaseAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+          description: Number of notifications per page
+        - in: query
+          name: unreadOnly
+          schema:
+            type: boolean
+            default: false
+          description: Only return unread notifications
+        - in: query
+          name: type
+          schema:
+            type: string
+          description: Filter by notification type
+      responses:
+        "200":
+          description: Notifications retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+                  unreadCount:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /notifications/unread-count:
+    get:
+      summary: Get count of unread notifications
+      tags:
+        - Notifications
+      security:
+        - FirebaseAuth: []
+      responses:
+        "200":
+          description: Unread count retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  unreadCount:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /notifications/stats:
+    get:
+      summary: Get notification statistics
+      tags:
+        - Notifications
+      security:
+        - FirebaseAuth: []
+      responses:
+        "200":
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  stats:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      unread:
+                        type: integer
+                      byType:
+                        type: object
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /notifications/preferences:
+    get:
+      summary: Get user notification preferences
+      tags:
+        - Notifications
+      security:
+        - FirebaseAuth: []
+      responses:
+        "200":
+          description: Preferences retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  preferences:
+                    $ref: "#/components/schemas/NotificationPreferences"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /notifications/debug:
+    get:
+      summary: Debug endpoint to help identify notification count issues
+      tags:
+        - Notifications
+      security:
+        - FirebaseAuth: []
+      responses:
+        "200":
+          description: Debug information retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  debug:
+                    type: object
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /notifications/type/{type}:
+    get:
+      summary: Get notifications by type
+      tags:
+        - Notifications
+      security:
+        - FirebaseAuth: []
+      parameters:
+        - in: path
+          name: type
+          required: true
+          schema:
+            type: string
+          description: Notification type to filter by
+      responses:
+        "200":
+          description: Notifications retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /notifications/mark-all-read:
+    post:
+      summary: Mark all notifications as read
+      tags:
+        - Notifications
+      security:
+        - FirebaseAuth: []
+      responses:
+        "200":
+          description: All notifications marked as read
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /notifications/read-all:
+    put:
+      summary: Mark all notifications as read (Frontend compatible endpoint)
+      tags:
+        - Notifications
+      security:
+        - FirebaseAuth: []
+      responses:
+        "200":
+          description: All notifications marked as read
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /notifications/test:
+    post:
+      summary: Create a test notification (development only)
+      tags:
+        - Notifications
+      security:
+        - FirebaseAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  default: SYSTEM_UPDATE
+                title:
+                  type: string
+                message:
+                  type: string
+      responses:
+        "201":
+          description: Test notification created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Notification"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /notifications/test-sound:
+    post:
+      summary: Create a test notification with sound alert
+      tags:
+        - Notifications
+      security:
+        - FirebaseAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  default: OFFER_MADE
+                  description: Notification type that triggers sound
+                title:
+                  type: string
+                  default: Test Sound Alert
+                message:
+                  type: string
+                  default: This is a test notification with sound alert
+                priority:
+                  type: string
+                  enum:
+                    - LOW
+                    - NORMAL
+                    - HIGH
+                    - URGENT
+                  default: HIGH
+      responses:
+        "201":
+          description: Test sound notification created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Notification"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /notifications/test-frontend:
+    get:
+      summary: Frontend debugging test endpoint (no auth required)
+      tags:
+        - Notifications
+      responses:
+        "200":
+          description: Test endpoint response with backend status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  user:
+                    type: object
+                  notifications:
+                    type: object
+                  frontendInstructions:
+                    type: object
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /notifications/webhook:
+    post:
+      summary: Webhook endpoint for external notification triggers
+      tags:
+        - Notifications
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+                - type
+                - title
+                - message
+              properties:
+                userId:
+                  type: string
+                  description: ID of the user to receive the notification
+                type:
+                  type: string
+                  description: Type of notification (will be uppercased)
+                title:
+                  type: string
+                  description: Notification title
+                message:
+                  type: string
+                  description: Notification message
+                metadata:
+                  type: object
+                  description: Additional metadata
+                priority:
+                  type: string
+                  enum:
+                    - LOW
+                    - NORMAL
+                    - HIGH
+                    - URGENT
+                  default: NORMAL
+                actionUrl:
+                  type: string
+                  description: URL for notification action
+      responses:
+        "201":
+          description: Webhook notification processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/Notification"
+        "400":
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /notifications/{notificationId}/read:
+    patch:
+      summary: Mark a specific notification as read
+      tags:
+        - Notifications
+      security:
+        - FirebaseAuth: []
+      parameters:
+        - in: path
+          name: notificationId
+          required: true
+          schema:
+            type: string
+          description: ID of the notification to mark as read
+      responses:
+        "200":
+          description: Notification marked as read
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Notification"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          description: Notification not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /notifications/{notificationId}:
+    delete:
+      summary: Delete a notification
+      tags:
+        - Notifications
+      security:
+        - FirebaseAuth: []
+      parameters:
+        - in: path
+          name: notificationId
+          required: true
+          schema:
+            type: string
+          description: ID of the notification to delete
+      responses:
+        "200":
+          description: Notification deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          description: Notification not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+components:
+  securitySchemes:
+    FirebaseAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Notification:
+      type: object
+      properties:
+        _id:
+          type: string
+        recipient:
+          type: string
+        type:
+          type: string
+          enum:
+            - TASK_UPDATE
+            - OFFER_MADE
+            - OFFER_ACCEPTED
+            - OFFER_REJECTED
+            - PAYMENT_RECEIVED
+            - PAYMENT_SENT
+            - REVIEW_RECEIVED
+            - SYSTEM_UPDATE
+            - MESSAGE_RECEIVED
+        title:
+          type: string
+        message:
+          type: string
+        isRead:
+          type: boolean
+        priority:
+          type: string
+          enum:
+            - LOW
+            - NORMAL
+            - HIGH
+            - URGENT
+        actionUrl:
+          type: string
+        metadata:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    NotificationPreferences:
+      type: object
+      properties:
+        emailNotifications:
+          type: boolean
+        pushNotifications:
+          type: boolean
+        smsNotifications:
+          type: boolean
+        notificationTypes:
+          type: object
+
+    Pagination:
+      type: object
+      properties:
+        currentPage:
+          type: integer
+        totalPages:
+          type: integer
+        totalCount:
+          type: integer
+        hasNextPage:
+          type: boolean
+        hasPrevPage:
+          type: boolean
+
+  responses:
+    UnauthorizedError:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              message:
+                type: string
+
+    ServerError:
+      description: Server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              message:
+                type: string
+              error:
+                type: string

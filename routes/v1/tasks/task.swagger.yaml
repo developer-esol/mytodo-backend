@@ -1,0 +1,1334 @@
+openapi: 3.0.0
+info:
+  title: Task API
+  description: API endpoints for task management including creation, updates, offers, questions, and payments
+  version: 1.0.0
+
+paths:
+  /tasks:
+    get:
+      tags:
+        - Tasks
+      summary: Get all tasks
+      description: Retrieve a list of tasks with optional filtering, pagination, and sorting
+      parameters:
+        - in: query
+          name: category
+          schema:
+            type: string
+          description: Filter by category (case-insensitive regex)
+        - in: query
+          name: minBudget
+          schema:
+            type: number
+          description: Minimum budget filter
+        - in: query
+          name: maxBudget
+          schema:
+            type: number
+          description: Maximum budget filter
+        - in: query
+          name: location
+          schema:
+            type: string
+          description: Location coordinates in format "lat,lng"
+        - in: query
+          name: radius
+          schema:
+            type: number
+          description: Search radius in meters (requires location parameter)
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [open, assigned, in-progress, completed, cancelled, expired]
+          description: Filter by task status (defaults to 'open')
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search in title, details, or location address
+        - in: query
+          name: sort
+          schema:
+            type: string
+          description: Sort fields (comma-separated, prefix with - for descending)
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+          description: Number of results per page
+      responses:
+        200:
+          description: Tasks retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  count:
+                    type: integer
+                    description: Number of tasks in current response
+                  total:
+                    type: integer
+                    description: Total number of tasks matching query
+                  pages:
+                    type: integer
+                    description: Total number of pages
+                  currentPage:
+                    type: integer
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TaskWithOfferCount"
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      tags:
+        - Tasks
+      summary: Create a new task
+      description: Create a new task with details, budget, location, and optional images
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - title
+                - category
+                - details
+                - budget
+                - dateType
+              properties:
+                title:
+                  type: string
+                  description: Task title
+                category:
+                  type: string
+                  description: Task category (can be comma-separated for multiple)
+                date:
+                  type: string
+                  format: date
+                  description: Task date (required for DoneBy and DoneOn dateTypes)
+                time:
+                  type: string
+                  default: Anytime
+                  description: Task time (defaults to 'Anytime' if empty)
+                location:
+                  type: string
+                  description: Task location address (required for In-person tasks)
+                details:
+                  type: string
+                  description: Detailed task description
+                budget:
+                  type: number
+                  description: Task budget amount
+                currency:
+                  type: string
+                  default: LKR
+                  description: Currency code
+                dateType:
+                  type: string
+                  enum: [Easy, DoneBy, DoneOn]
+                  description: Task date type
+                locationType:
+                  type: string
+                  enum: [In-person, Online]
+                  default: In-person
+                  description: Task location type
+                coordinates:
+                  type: string
+                  description: JSON string of coordinates {lat, lng}
+                isMovingTask:
+                  type: boolean
+                  description: Whether this is a moving task (mobile app only)
+                pickupLocation:
+                  type: string
+                  description: Pickup address for moving tasks
+                pickupPostalCode:
+                  type: string
+                  description: Pickup postal code for moving tasks
+                dropoffLocation:
+                  type: string
+                  description: Dropoff address for moving tasks
+                dropoffPostalCode:
+                  type: string
+                  description: Dropoff postal code for moving tasks
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Task images (uploaded files)
+      responses:
+        201:
+          description: Task created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Task"
+        400:
+          description: Validation error or bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /tasks/post-task:
+    post:
+      tags:
+        - Tasks
+      summary: Create a new task (legacy endpoint)
+      description: Legacy endpoint for backward compatibility - same as POST /tasks
+      security:
+        - bearerAuth: []
+      requestBody:
+        $ref: "#/paths/~1tasks/post/requestBody"
+      responses:
+        201:
+          $ref: "#/paths/~1tasks/post/responses/201"
+        400:
+          $ref: "#/paths/~1tasks/post/responses/400"
+        401:
+          $ref: "#/paths/~1tasks/post/responses/401"
+
+  /tasks/search:
+    get:
+      tags:
+        - Tasks
+      summary: Search tasks
+      description: Search for tasks with advanced filtering
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+          description: Search query
+        - in: query
+          name: category
+          schema:
+            type: string
+        - in: query
+          name: location
+          schema:
+            type: string
+        - in: query
+          name: minBudget
+          schema:
+            type: number
+        - in: query
+          name: maxBudget
+          schema:
+            type: number
+      responses:
+        200:
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Task"
+
+  /tasks/my-tasks:
+    get:
+      tags:
+        - Tasks
+      summary: Get current user's tasks
+      description: Get tasks posted by or assigned to the current user
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [open, assigned, in-progress, completed, cancelled, expired]
+          description: Filter by task status
+        - in: query
+          name: role
+          schema:
+            type: string
+            enum: [poster, tasker]
+          description: Filter by user role (poster = created tasks, tasker = assigned tasks)
+        - in: query
+          name: subSection
+          schema:
+            type: string
+          description: Additional filtering by subsection
+      responses:
+        200:
+          description: User tasks retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Task"
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /tasks/my-offers:
+    get:
+      tags:
+        - Tasks
+      summary: Get current user's offers
+      description: Get tasks where the user has made offers
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: User offers retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Task"
+
+  /tasks/my-tasks/payment-status:
+    get:
+      tags:
+        - Tasks
+      summary: Get tasks with payment status
+      description: Get user's tasks with their payment status information
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Tasks with payment status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TaskWithPaymentStatus"
+
+  /tasks/{id}:
+    get:
+      tags:
+        - Tasks
+      summary: Get single task by ID
+      description: Retrieve detailed information about a specific task
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Task ID (MongoDB ObjectId)
+      responses:
+        200:
+          description: Task retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/TaskDetailed"
+                  user:
+                    $ref: "#/components/schemas/User"
+        404:
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      tags:
+        - Tasks
+      summary: Update task
+      description: Update task details (only task owner can update)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Task ID (MongoDB ObjectId)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                budget:
+                  type: number
+                currency:
+                  type: string
+                time:
+                  type: string
+                date:
+                  type: string
+                  format: date
+                dateType:
+                  type: string
+                  enum: [Easy, DoneBy, DoneOn]
+                location:
+                  type: object
+                  properties:
+                    address:
+                      type: string
+                    coordinates:
+                      type: object
+                      properties:
+                        lat:
+                          type: number
+                        lng:
+                          type: number
+      responses:
+        200:
+          description: Task updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Task"
+        401:
+          description: Not authorized to update this task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        404:
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      tags:
+        - Tasks
+      summary: Delete task
+      description: Delete a task (only owner can delete, only open/expired tasks)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Task ID (MongoDB ObjectId)
+      responses:
+        200:
+          description: Task deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        401:
+          description: Not authorized to delete this task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        404:
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /tasks/{id}/offers:
+    get:
+      tags:
+        - Offers
+      summary: Get task with offers
+      description: Get detailed task information including all offers
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Task ID (MongoDB ObjectId)
+      responses:
+        200:
+          description: Task with offers retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/TaskWithOffers"
+
+    post:
+      tags:
+        - Offers
+      summary: Create offer for task
+      description: Submit an offer to work on a task
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Task ID (MongoDB ObjectId)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - offerAmount
+                - message
+              properties:
+                offerAmount:
+                  type: number
+                  description: Offer amount
+                currency:
+                  type: string
+                  default: LKR
+                  description: Currency code
+                message:
+                  type: string
+                  description: Message to task poster
+                estimatedDuration:
+                  type: string
+                  description: Estimated time to complete
+      responses:
+        201:
+          description: Offer created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Offer"
+        401:
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /tasks/{id}/accept:
+    post:
+      tags:
+        - Tasks
+      summary: Accept task (legacy)
+      description: Accept a task assignment
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Task ID (MongoDB ObjectId)
+      responses:
+        200:
+          description: Task accepted successfully
+
+  /tasks/{id}/status:
+    put:
+      tags:
+        - Tasks
+      summary: Update task status
+      description: Update the status of a task
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Task ID (MongoDB ObjectId)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum:
+                    [open, assigned, in-progress, completed, cancelled, expired]
+      responses:
+        200:
+          description: Task status updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Task"
+
+  /tasks/{id}/complete:
+    patch:
+      tags:
+        - Tasks
+      summary: Mark task as complete (PATCH)
+      description: Mark a task as completed
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Task ID (MongoDB ObjectId)
+      responses:
+        200:
+          description: Task marked as complete
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Task"
+
+  /tasks/{taskId}/complete:
+    patch:
+      tags:
+        - Tasks
+      summary: Mark task as complete
+      description: Mark a task as completed (alternate endpoint)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Task ID (MongoDB ObjectId)
+      responses:
+        200:
+          description: Task marked as complete
+
+    put:
+      tags:
+        - Tasks
+      summary: Mark task as complete (PUT)
+      description: Mark a task as completed (PUT method for frontend compatibility)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Task ID (MongoDB ObjectId)
+      responses:
+        200:
+          description: Task marked as complete
+
+  /tasks/{taskId}/completion-status:
+    get:
+      tags:
+        - Tasks
+      summary: Check task completion status
+      description: Check if a task can be marked as complete
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Task ID (MongoDB ObjectId)
+      responses:
+        200:
+          description: Completion status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  canComplete:
+                    type: boolean
+                  reason:
+                    type: string
+
+  /tasks/{taskId}/cancel:
+    put:
+      tags:
+        - Tasks
+      summary: Cancel task
+      description: Cancel a task
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Task ID (MongoDB ObjectId)
+      responses:
+        200:
+          description: Task cancelled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Task"
+
+  /tasks/{taskId}/offers/{offerId}/accept:
+    post:
+      tags:
+        - Offers
+      summary: Accept an offer (POST)
+      description: Accept a specific offer for a task
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Task ID (MongoDB ObjectId)
+        - in: path
+          name: offerId
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Offer ID (MongoDB ObjectId)
+      responses:
+        200:
+          description: Offer accepted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Offer"
+
+    put:
+      tags:
+        - Offers
+      summary: Accept an offer (PUT)
+      description: Accept a specific offer for a task (PUT method)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Task ID (MongoDB ObjectId)
+        - in: path
+          name: offerId
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Offer ID (MongoDB ObjectId)
+      responses:
+        200:
+          description: Offer accepted successfully
+
+  /tasks/{taskId}/complete-payment:
+    post:
+      tags:
+        - Payments
+      summary: Complete task payment
+      description: Complete the payment process for a task
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Task ID (MongoDB ObjectId)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                paymentIntentId:
+                  type: string
+                  description: Stripe payment intent ID
+      responses:
+        200:
+          description: Payment completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /tasks/{taskId}/questions:
+    get:
+      tags:
+        - Questions
+      summary: Get task questions
+      description: Get all questions asked about a task
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Task ID (MongoDB ObjectId)
+      responses:
+        200:
+          description: Questions retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Question"
+
+    post:
+      tags:
+        - Questions
+      summary: Ask a question about task
+      description: Post a new question about a task with optional images
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Task ID (MongoDB ObjectId)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - question
+              properties:
+                question:
+                  type: string
+                  description: Question text
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Question images
+      responses:
+        201:
+          description: Question created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Question"
+
+  /tasks/{taskId}/questions/{questionId}/answer:
+    post:
+      tags:
+        - Questions
+      summary: Answer a question
+      description: Answer a question about a task with optional images
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Task ID (MongoDB ObjectId)
+        - in: path
+          name: questionId
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Question ID (MongoDB ObjectId)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - answer
+              properties:
+                answer:
+                  type: string
+                  description: Answer text
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Answer images
+      responses:
+        200:
+          description: Answer posted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Question"
+
+  /tasks/user/{userId}:
+    get:
+      tags:
+        - Tasks
+      summary: Get tasks for specific user
+      description: Get all tasks created by or assigned to a specific user
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: User ID (MongoDB ObjectId)
+      responses:
+        200:
+          description: User tasks retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  count:
+                    type: integer
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserTask"
+        400:
+          description: Invalid user ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Task:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: Task ID
+        title:
+          type: string
+        categories:
+          type: array
+          items:
+            type: string
+        locationType:
+          type: string
+          enum: [In-person, Online]
+        date:
+          type: string
+          format: date-time
+        time:
+          type: string
+        location:
+          type: object
+          properties:
+            address:
+              type: string
+            coordinates:
+              type: object
+              properties:
+                lat:
+                  type: number
+                lng:
+                  type: number
+        details:
+          type: string
+        budget:
+          type: number
+        currency:
+          type: string
+        images:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [open, assigned, in-progress, completed, cancelled, expired]
+        createdBy:
+          $ref: "#/components/schemas/UserBasic"
+        assignedTo:
+          $ref: "#/components/schemas/UserBasic"
+        dateType:
+          type: string
+          enum: [Easy, DoneBy, DoneOn]
+        dateRange:
+          type: object
+          properties:
+            start:
+              type: string
+              format: date-time
+            end:
+              type: string
+              format: date-time
+        movingDetails:
+          type: object
+          properties:
+            pickupLocation:
+              type: object
+              properties:
+                address:
+                  type: string
+                postalCode:
+                  type: string
+            dropoffLocation:
+              type: object
+              properties:
+                address:
+                  type: string
+                postalCode:
+                  type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    TaskDetailed:
+      allOf:
+        - $ref: "#/components/schemas/Task"
+        - type: object
+          properties:
+            formattedDate:
+              type: string
+              description: Human-readable formatted date
+
+    TaskWithOfferCount:
+      allOf:
+        - $ref: "#/components/schemas/Task"
+        - type: object
+          properties:
+            offerCount:
+              type: integer
+              description: Number of offers received for this task
+
+    TaskWithOffers:
+      allOf:
+        - $ref: "#/components/schemas/Task"
+        - type: object
+          properties:
+            offers:
+              type: array
+              items:
+                $ref: "#/components/schemas/Offer"
+
+    TaskWithPaymentStatus:
+      allOf:
+        - $ref: "#/components/schemas/Task"
+        - type: object
+          properties:
+            paymentStatus:
+              type: string
+              enum: [pending, completed, failed, refunded]
+            paymentDetails:
+              type: object
+
+    UserTask:
+      type: object
+      properties:
+        _id:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+        budget:
+          type: number
+        currency:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        date:
+          type: string
+          format: date-time
+        createdBy:
+          $ref: "#/components/schemas/UserBasic"
+        assignedTo:
+          $ref: "#/components/schemas/UserBasic"
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        review:
+          type: string
+
+    Offer:
+      type: object
+      properties:
+        _id:
+          type: string
+        taskId:
+          type: string
+        taskCreatorId:
+          type: string
+        taskTakerId:
+          type: string
+        offerAmount:
+          type: number
+        currency:
+          type: string
+        message:
+          type: string
+        estimatedDuration:
+          type: string
+        status:
+          type: string
+          enum: [pending, accepted, rejected, withdrawn]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Question:
+      type: object
+      properties:
+        _id:
+          type: string
+        taskId:
+          type: string
+        askedBy:
+          $ref: "#/components/schemas/UserBasic"
+        question:
+          type: string
+        questionImages:
+          type: array
+          items:
+            type: string
+        answer:
+          type: string
+        answerImages:
+          type: array
+          items:
+            type: string
+        answeredBy:
+          $ref: "#/components/schemas/UserBasic"
+        answeredAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    UserBasic:
+      type: object
+      properties:
+        _id:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        avatar:
+          type: string
+        rating:
+          type: number
+
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        avatar:
+          type: string
+        rating:
+          type: number
+        bio:
+          type: string
+        location:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+        verified:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+        message:
+          type: string

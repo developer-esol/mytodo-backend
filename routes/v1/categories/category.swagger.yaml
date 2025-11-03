@@ -1,0 +1,328 @@
+openapi: 3.0.0
+info:
+  title: Category Management API
+  version: 1.0.0
+  description: API endpoints for managing categories, including public access for listing and protected routes for CRUD operations by administrators.
+servers:
+  - url: /api/categories # Assuming the router is mounted here
+    description: Primary API Server
+
+tags:
+  - name: Categories
+    description: Operations related to product or service categories.
+
+paths:
+  /categories/:
+    get:
+      tags: [Categories]
+      summary: Get all active categories
+      description: Retrieves a list of all active categories, sorted by order and name. This is a public route.
+      responses:
+        "200":
+          description: A list of categories returned successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Category"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+    post:
+      tags: [Categories]
+      summary: Create a new category (Protected)
+      description: Creates a new category. Requires an authenticated Admin user.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryCreateRequest"
+      responses:
+        "201":
+          description: Category created successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Category"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /categories/by-location:
+    get:
+      tags: [Categories]
+      summary: Get categories filtered by location type
+      description: Retrieves categories based on whether they are relevant for "In-person" or "Online" location types. This is a public route.
+      parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [In-person, Online]
+          required: true
+          description: The desired location relevance type.
+      responses:
+        "200":
+          description: A list of filtered categories returned successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Category"
+                  locationType:
+                    type: string
+                    example: In-person
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /categories/{id}:
+    put:
+      tags: [Categories]
+      summary: Update an existing category by ID (Protected)
+      description: Updates an existing category by its MongoDB ID. Requires an authenticated Admin user.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+          description: The MongoDB ID of the category to update.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryUpdateRequest"
+      responses:
+        "200":
+          description: Category updated successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Category"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+    delete:
+      tags: [Categories]
+      summary: Delete a category by ID (Protected)
+      description: Deletes a category by its MongoDB ID. Requires an authenticated Admin user.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+          description: The MongoDB ID of the category to delete.
+      responses:
+        "200":
+          description: Category deleted successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Category deleted successfully"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Enter the JWT token (Admin access required for protected routes)
+
+  schemas:
+    Category:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: MongoDB unique identifier.
+          example: "654e95d51d1a6d001f31f5a1"
+        name:
+          type: string
+          description: Name of the category.
+          example: "Fitness & Wellness"
+        description:
+          type: string
+          description: A brief description of the category.
+          example: "Activities focused on physical and mental health."
+        icon:
+          type: string
+          description: Relative path to the category icon on the server.
+          example: "/uploads/icons/fitness.svg"
+        iconUrl:
+          type: string
+          description: Full public URL for the category icon.
+          example: "http://localhost:3000/uploads/icons/fitness.svg"
+        locationType:
+          type: string
+          enum: [physical, online, both]
+          description: Indicates where the category's activities take place.
+          example: "both"
+        order:
+          type: integer
+          description: Display order of the category (lower number comes first).
+          example: 1
+      required:
+        - name
+        - locationType
+
+    CategoryCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Cooking Classes"
+        description:
+          type: string
+          example: "Learn new recipes and cooking techniques."
+        icon:
+          type: string
+          example: "/uploads/icons/cooking.svg"
+        locationType:
+          type: string
+          enum: [physical, online, both]
+          example: "online"
+        order:
+          type: integer
+          example: 5
+      required:
+        - name
+        - locationType
+
+    CategoryUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Art Workshops (Updated)"
+        description:
+          type: string
+          example: "Hands-on creative activities."
+        icon:
+          type: string
+          example: "/uploads/icons/art.svg"
+        locationType:
+          type: string
+          enum: [physical, online, both]
+          example: "physical"
+        order:
+          type: integer
+          example: 3
+        isActive:
+          type: boolean
+          description: Whether the category should be visible or not.
+          example: true
+
+  responses:
+    UnauthorizedError:
+      description: Unauthorized (Missing or invalid token)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: "Not authorized, token failed"
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: "Category not found"
+
+    BadRequestError:
+      description: Invalid request parameters or body
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: 'Invalid location type. Must be "In-person" or "Online"'
+
+    ServerError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: "Error fetching categories"
+              error:
+                type: string
+                example: "Database connection failed"
