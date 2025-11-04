@@ -1,12 +1,3 @@
-openapi: 3.0.0
-info:
-  title: Admin Panel API
-  description: API endpoints for administrative functions including user management, task management, analytics, and system configuration
-  version: 1.0.0
-
-security:
-  - adminAuth: []
-
 paths:
   /admin/login:
     post:
@@ -483,13 +474,6 @@ paths:
                     format: date-time
 
 components:
-  securitySchemes:
-    adminAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: Admin JWT token obtained from login
-
   schemas:
     AdminUser:
       type: object

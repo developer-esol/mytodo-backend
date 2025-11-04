@@ -7,19 +7,17 @@ const PendingUser = require("../../../models/user/PendingUser");
 const jwt = require("jsonwebtoken");
 const twilio = require("twilio");
 const twofactorAuthValidator = require("../../../validators/v1/auth/twofactorAuth.validator");
+const logger = require("../../../config/logger");
 
 const router = express.Router();
 require("dotenv").config(); // if using .env
 
-console.log("SID:", process.env.TWILIO_ACCOUNT_SID ? "[present]" : "[MISSING]");
-console.log(
-  "TOKEN:",
-  process.env.TWILIO_AUTH_TOKEN ? "[present]" : "[MISSING]"
-);
-console.log(
-  "VERIFY_SID:",
-  process.env.VERIFY_SERVICE_SID ? "[present]" : "[MISSING]"
-);
+logger.info("Twilio configuration check", {
+  route: "TwoFactorAuth.js",
+  hasSID: !!process.env.TWILIO_ACCOUNT_SID,
+  hasToken: !!process.env.TWILIO_AUTH_TOKEN,
+  hasVerifySID: !!process.env.VERIFY_SERVICE_SID,
+});
 
 // Email Transporter Configuration
 const transporter = nodemailer.createTransport({
@@ -71,7 +69,12 @@ const cleanupConflictingRegistrations = async (email, phone) => {
 
     return { success: true };
   } catch (error) {
-    console.error("Cleanup error:", error);
+    logger.error("Cleanup error", {
+      route: "TwoFactorAuth.js",
+      function: "cleanupConflictingRegistrations",
+      error: error.message,
+      stack: error.stack,
+    });
     return { error: "System error during cleanup" };
   }
 };
@@ -86,7 +89,11 @@ const sendOTP = async (email, phone, otp) => {
       text: `Your OTP is ${otp}. It expires in 10 minutes.`,
       html: `<p>Your OTP is <strong>${otp}</strong>. It expires in 10 minutes.</p>`,
     });
-    console.log(`OTP sent to email: ${email}`);
+    logger.info("OTP sent to email", {
+      route: "TwoFactorAuth.js",
+      function: "sendOTP",
+      email,
+    });
 
     // Send SMS if phone number exists and Twilio is configured
     if (
@@ -101,20 +108,37 @@ const sendOTP = async (email, phone, otp) => {
           from: process.env.TWILIO_PHONE_NUMBER,
           to: phone,
         });
-        console.log(`OTP sent to phone: ${phone}`);
+        logger.info("OTP sent to phone", {
+          route: "TwoFactorAuth.js",
+          function: "sendOTP",
+          phone,
+        });
       } catch (smsError) {
-        console.warn(`Failed to send SMS to ${phone}:`, smsError.message);
+        logger.warn("Failed to send SMS", {
+          route: "TwoFactorAuth.js",
+          function: "sendOTP",
+          phone,
+          error: smsError.message,
+        });
         // Don't throw error for SMS failure, email is sufficient
       }
     } else if (phone) {
-      console.warn(
-        `SMS sending skipped for ${phone}: Twilio not properly configured`
-      );
+      logger.warn("SMS sending skipped - Twilio not properly configured", {
+        route: "TwoFactorAuth.js",
+        function: "sendOTP",
+        phone,
+      });
     }
 
     return true;
   } catch (error) {
-    console.error("Error sending OTP:", error);
+    logger.error("Error sending OTP", {
+      route: "TwoFactorAuth.js",
+      function: "sendOTP",
+      email,
+      error: error.message,
+      stack: error.stack,
+    });
     throw error;
   }
 };
@@ -125,7 +149,12 @@ router.post(
   ...twofactorAuthValidator.otpVerification,
   async (req, res) => {
     const { email, otp } = req.body;
-    console.log("OTP verification request received:", { email, otp });
+    logger.info("OTP verification request received", {
+      route: "TwoFactorAuth.js",
+      endpoint: "/otp-verification",
+      email,
+      hasOtp: !!otp,
+    });
     if (!email || !otp) {
       return res
         .status(400)
@@ -174,7 +203,12 @@ router.post(
           channel: "sms",
         });
 
-      console.log("Twilio SMS OTP sent:", verification.status);
+      logger.info("Twilio SMS OTP sent", {
+        route: "TwoFactorAuth.js",
+        endpoint: "/otp-verification",
+        email,
+        status: verification.status,
+      });
 
       // Respond with success and move to next step
       return res.status(200).json({
@@ -183,7 +217,13 @@ router.post(
         message: "Email verified. SMS OTP sent to phone.",
       });
     } catch (error) {
-      console.error("OTP verification error:", error);
+      logger.error("OTP verification error", {
+        route: "TwoFactorAuth.js",
+        endpoint: "/otp-verification",
+        email: req.body.email,
+        error: error.message,
+        stack: error.stack,
+      });
       return res.status(500).json({
         success: false,
         message: "An error occurred during verification",
@@ -196,7 +236,12 @@ router.post(
   ...twofactorAuthValidator.smsVerification,
   async (req, res) => {
     const { email, otp } = req.body;
-    console.log("SMS verification request received:", { email, otp });
+    logger.info("SMS verification request received", {
+      route: "TwoFactorAuth.js",
+      endpoint: "/sms-verification",
+      email,
+      hasOtp: !!otp,
+    });
 
     if (!email || !otp) {
       return res
@@ -311,7 +356,13 @@ router.post(
           message: "Account verified and created successfully!",
         });
       } catch (saveError) {
-        console.error("User creation error:", saveError);
+        logger.error("User creation error", {
+          route: "TwoFactorAuth.js",
+          endpoint: "/sms-verification",
+          email: req.body.email,
+          error: saveError.message,
+          stack: saveError.stack,
+        });
 
         // If it's a duplicate key error, provide specific message
         if (saveError.code === 11000) {
@@ -336,7 +387,13 @@ router.post(
         });
       }
     } catch (error) {
-      console.error("SMS verification error:", error);
+      logger.error("SMS verification error", {
+        route: "TwoFactorAuth.js",
+        endpoint: "/sms-verification",
+        email: req.body.email,
+        error: error.message,
+        stack: error.stack,
+      });
       return res.status(500).json({
         verified: false,
         message: "An error occurred during SMS verification",
@@ -418,14 +475,26 @@ router.post(
           message: "New OTP sent successfully",
         });
       } catch (sendError) {
-        console.error("Error sending OTP:", sendError);
+        logger.error("Error sending OTP", {
+          route: "TwoFactorAuth.js",
+          endpoint: "/resend-otp",
+          email,
+          error: sendError.message,
+          stack: sendError.stack,
+        });
         return res.status(500).json({
           success: false,
           message: "Failed to send OTP. Please try again.",
         });
       }
     } catch (error) {
-      console.error("Resend OTP error:", error);
+      logger.error("Resend OTP error", {
+        route: "TwoFactorAuth.js",
+        endpoint: "/resend-otp",
+        email: req.body.email,
+        error: error.message,
+        stack: error.stack,
+      });
       return res.status(500).json({
         success: false,
         message: "Failed to resend OTP",
@@ -484,14 +553,24 @@ router.post(
         html: `<p>Your OTP is <strong>${otp}</strong>. It expires in 10 minutes.</p>`,
       });
 
-      console.log(`OTP sent to email: ${email}`);
+      logger.info("OTP sent to email", {
+        route: "TwoFactorAuth.js",
+        endpoint: "/send-email",
+        email,
+      });
 
       return res.status(200).json({
         success: true,
         message: "OTP sent to your email successfully",
       });
     } catch (error) {
-      console.error("Send email OTP error:", error);
+      logger.error("Send email OTP error", {
+        route: "TwoFactorAuth.js",
+        endpoint: "/send-email",
+        email: req.body.email,
+        error: error.message,
+        stack: error.stack,
+      });
       return res.status(500).json({
         success: false,
         message: "Failed to send OTP email",
@@ -548,7 +627,12 @@ router.post(
         results,
       });
     } catch (error) {
-      console.error("Check availability error:", error);
+      logger.error("Check availability error", {
+        route: "TwoFactorAuth.js",
+        endpoint: "/check-availability",
+        error: error.message,
+        stack: error.stack,
+      });
       return res.status(500).json({
         success: false,
         message: "Failed to check availability",
@@ -564,10 +648,17 @@ setInterval(async () => {
       otpExpires: { $lt: new Date() },
     });
     if (result.deletedCount > 0) {
-      console.log(`Cleaned up ${result.deletedCount} expired OTPs`);
+      logger.info("Cleaned up expired OTPs", {
+        route: "TwoFactorAuth.js",
+        deletedCount: result.deletedCount,
+      });
     }
   } catch (error) {
-    console.error("Error cleaning up expired OTPs:", error);
+    logger.error("Error cleaning up expired OTPs", {
+      route: "TwoFactorAuth.js",
+      error: error.message,
+      stack: error.stack,
+    });
   }
 }, 60000); // Run every minute
 

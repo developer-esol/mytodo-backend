@@ -19,7 +19,7 @@ paths:
       tags:
         - Notifications
       security:
-        - FirebaseAuth: []
+        - bearerAuth: []
       parameters:
         - in: query
           name: page
@@ -73,7 +73,7 @@ paths:
       tags:
         - Notifications
       security:
-        - FirebaseAuth: []
+        - bearerAuth: []
       responses:
         "200":
           description: Unread count retrieved successfully
@@ -97,7 +97,7 @@ paths:
       tags:
         - Notifications
       security:
-        - FirebaseAuth: []
+        - bearerAuth: []
       responses:
         "200":
           description: Statistics retrieved successfully
@@ -128,7 +128,7 @@ paths:
       tags:
         - Notifications
       security:
-        - FirebaseAuth: []
+        - bearerAuth: []
       responses:
         "200":
           description: Preferences retrieved successfully
@@ -152,7 +152,7 @@ paths:
       tags:
         - Notifications
       security:
-        - FirebaseAuth: []
+        - bearerAuth: []
       responses:
         "200":
           description: Debug information retrieved successfully
@@ -176,7 +176,7 @@ paths:
       tags:
         - Notifications
       security:
-        - FirebaseAuth: []
+        - bearerAuth: []
       parameters:
         - in: path
           name: type
@@ -209,7 +209,7 @@ paths:
       tags:
         - Notifications
       security:
-        - FirebaseAuth: []
+        - bearerAuth: []
       responses:
         "200":
           description: All notifications marked as read
@@ -233,7 +233,7 @@ paths:
       tags:
         - Notifications
       security:
-        - FirebaseAuth: []
+        - bearerAuth: []
       responses:
         "200":
           description: All notifications marked as read
@@ -257,7 +257,7 @@ paths:
       tags:
         - Notifications
       security:
-        - FirebaseAuth: []
+        - bearerAuth: []
       requestBody:
         required: false
         content:
@@ -295,7 +295,7 @@ paths:
       tags:
         - Notifications
       security:
-        - FirebaseAuth: []
+        - bearerAuth: []
       requestBody:
         required: false
         content:
@@ -441,7 +441,7 @@ paths:
       tags:
         - Notifications
       security:
-        - FirebaseAuth: []
+        - bearerAuth: []
       parameters:
         - in: path
           name: notificationId
@@ -483,7 +483,7 @@ paths:
       tags:
         - Notifications
       security:
-        - FirebaseAuth: []
+        - bearerAuth: []
       parameters:
         - in: path
           name: notificationId

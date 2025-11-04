@@ -19,8 +19,8 @@ const signup = [
     .notEmpty()
     .withMessage("Email is required")
     .isEmail()
-    .withMessage("Invalid email format")
-    .normalizeEmail(),
+    .withMessage("Invalid email format"),
+  // Removed .normalizeEmail() to preserve dots in email addresses
   body("password")
     .notEmpty()
     .withMessage("Password is required")
@@ -52,8 +52,8 @@ const login = [
     .notEmpty()
     .withMessage("Email is required")
     .isEmail()
-    .withMessage("Invalid email format")
-    .normalizeEmail(),
+    .withMessage("Invalid email format"),
+  // Removed .normalizeEmail() to preserve dots in email addresses
   body("password").notEmpty().withMessage("Password is required"),
   validateRequest,
 ];

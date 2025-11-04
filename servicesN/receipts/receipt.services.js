@@ -3,6 +3,7 @@ const {
   generateReceiptPDF,
   generateReceiptsForCompletedTask,
 } = require("../../shared/services/receiptService");
+const logger = require("../../config/logger");
 
 const transformReceipt = (receipt, userId) => ({
   receiptId: receipt._id,
@@ -150,43 +151,81 @@ const downloadReceipt = async (receiptId, userId) => {
 };
 
 const getTaskReceipts = async (userId, taskId) => {
-  console.log(`📄 Receipt request - User: ${userId}, Task: ${taskId}`);
+  logger.info("Receipt request received", {
+    service: "receipt.services",
+    function: "getTaskReceipts",
+    userId,
+    taskId,
+  });
 
   let receipts = await receiptRepository.findReceiptsByTask(taskId, userId);
 
-  console.log(`📄 Found ${receipts.length} receipts for task ${taskId}`);
+  logger.info("Found receipts for task", {
+    service: "receipt.services",
+    function: "getTaskReceipts",
+    userId,
+    taskId,
+    receiptCount: receipts.length,
+  });
 
   if (!receipts || receipts.length === 0) {
-    console.log(`🔍 No receipts found, checking task status...`);
+    logger.debug("No receipts found, checking task status", {
+      service: "receipt.services",
+      function: "getTaskReceipts",
+      taskId,
+    });
 
     const task = await receiptRepository.findTaskById(taskId);
     if (!task) {
-      console.log(`❌ Task ${taskId} not found`);
+      logger.warn("Task not found", {
+        service: "receipt.services",
+        function: "getTaskReceipts",
+        taskId,
+      });
       throw new Error("Task not found");
     }
 
-    console.log(
-      `📋 Task status: ${task.status}, CreatedBy: ${task.createdBy}, AssignedTo: ${task.assignedTo}`
-    );
+    logger.debug("Task details retrieved", {
+      service: "receipt.services",
+      function: "getTaskReceipts",
+      taskId,
+      taskStatus: task.status,
+      createdBy: task.createdBy,
+      assignedTo: task.assignedTo,
+    });
 
     const hasAccess =
       task.createdBy.toString() === userId.toString() ||
       task.assignedTo?.toString() === userId.toString();
 
     if (!hasAccess) {
-      console.log(`🚫 User ${userId} has no access to task ${taskId}`);
+      logger.warn("User access denied to task", {
+        service: "receipt.services",
+        function: "getTaskReceipts",
+        userId,
+        taskId,
+      });
       throw new Error("Access denied to this task");
     }
 
     if (task.status === "completed") {
-      console.log(`🔄 Task is completed, attempting to generate receipts...`);
+      logger.info("Task is completed, attempting to generate receipts", {
+        service: "receipt.services",
+        function: "getTaskReceipts",
+        taskId,
+        taskStatus: task.status,
+      });
 
       const completedPayment = await receiptRepository.findCompletedPayment(
         taskId
       );
 
       if (!completedPayment) {
-        console.log(`💳 No completed payment found for task ${taskId}`);
+        logger.warn("No completed payment found for task", {
+          service: "receipt.services",
+          function: "getTaskReceipts",
+          taskId,
+        });
         return {
           taskId: taskId,
           receipts: [],
@@ -199,9 +238,12 @@ const getTaskReceipts = async (userId, taskId) => {
       );
 
       if (existingReceipts.length > 0) {
-        console.log(
-          `🔍 Found ${existingReceipts.length} existing receipts for task ${taskId}, skipping generation`
-        );
+        logger.info("Found existing receipts, skipping generation", {
+          service: "receipt.services",
+          function: "getTaskReceipts",
+          taskId,
+          existingReceiptCount: existingReceipts.length,
+        });
 
         const userReceipts = existingReceipts.filter(
           (receipt) =>
@@ -231,12 +273,21 @@ const getTaskReceipts = async (userId, taskId) => {
         }
       }
 
-      console.log(`🔨 Generating receipts for completed task ${taskId}...`);
+      logger.info("Generating receipts for completed task", {
+        service: "receipt.services",
+        function: "getTaskReceipts",
+        taskId,
+      });
       await generateReceiptsForCompletedTask(taskId);
 
       receipts = await receiptRepository.findReceiptsByTask(taskId, userId);
     } else {
-      console.log(`📄 No receipts available - Task status: ${task.status}`);
+      logger.info("No receipts available - task not completed", {
+        service: "receipt.services",
+        function: "getTaskReceipts",
+        taskId,
+        taskStatus: task.status,
+      });
       throw new Error(
         task.status === "completed"
           ? "Receipts are being generated, please try again in a few moments"
@@ -257,9 +308,12 @@ const getTaskReceipts = async (userId, taskId) => {
       (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
     )[0];
     userRelevantReceipts.push(latestPaymentReceipt);
-    console.log(
-      `📄 Added payment receipt for poster: ${latestPaymentReceipt.receiptNumber}`
-    );
+    logger.debug("Added payment receipt for poster", {
+      service: "receipt.services",
+      function: "getTaskReceipts",
+      receiptNumber: latestPaymentReceipt.receiptNumber,
+      userId,
+    });
   }
 
   const earningsReceipts = receipts.filter(
@@ -272,9 +326,12 @@ const getTaskReceipts = async (userId, taskId) => {
       (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
     )[0];
     userRelevantReceipts.push(latestEarningsReceipt);
-    console.log(
-      `📄 Added earnings receipt for tasker: ${latestEarningsReceipt.receiptNumber}`
-    );
+    logger.debug("Added earnings receipt for tasker", {
+      service: "receipt.services",
+      function: "getTaskReceipts",
+      receiptNumber: latestEarningsReceipt.receiptNumber,
+      userId,
+    });
   }
 
   const transformedReceipts = userRelevantReceipts.map((receipt) => ({
@@ -292,7 +349,13 @@ const getTaskReceipts = async (userId, taskId) => {
     status: "generated",
   }));
 
-  console.log(`📤 Returning ${transformedReceipts.length} filtered receipts`);
+  logger.info("Returning filtered receipts", {
+    service: "receipt.services",
+    function: "getTaskReceipts",
+    taskId,
+    receiptCount: transformedReceipts.length,
+    userId,
+  });
 
   return {
     taskId: taskId,

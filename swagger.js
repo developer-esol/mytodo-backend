@@ -22,16 +22,34 @@ const options = {
             : "Development server",
       },
       {
-        url: `http://localhost:5001/api`,
-        description: "Local development server",
-      },
-      {
         url: `http://134.199.172.167:5001/api`,
-        description: "Production server (HTTP)",
+        description: "Development server (HTTP)",
+      },
+    ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+          description: "Enter your JWT token in the format: Bearer <token>",
+        },
+        firebaseAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+          description: "Enter your Firebase JWT token",
+        },
+      },
+    },
+    security: [
+      {
+        bearerAuth: [],
       },
     ],
   },
   apis: [
+    "./routes/v1/users/userRoutes.swagger.yaml",
     "./routes/v1/auth/auth.swagger.yaml",
     "./routes/v1/auth/twoFactorAuth.swagger.yaml",
     "./routes/v1/categories/category.swagger.yaml",
@@ -43,8 +61,8 @@ const options = {
     "./routes/v1/payments/serviceFee.swagger.yaml",
     "./routes/v1/reviews/review.swagger.yaml",
     "./routes/v1/tasks/task.swagger.yaml",
-    "./routes/v1/users/userRoutes.swagger.yaml",
     "./routes/v1/users/userReview.swagger.yaml",
+    "./routes/v1/admin/admin.swagger.yaml",
   ],
 };
 

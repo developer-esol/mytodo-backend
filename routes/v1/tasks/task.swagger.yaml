@@ -1052,12 +1052,6 @@ paths:
                 $ref: "#/components/schemas/Error"
 
 components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-
   schemas:
     Task:
       type: object

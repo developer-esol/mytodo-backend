@@ -11,6 +11,7 @@ const Offer = require("../../../models/task/Offer");
 const notificationService = require("../../../shared/services/notificationService");
 const { protect } = require("../../../middleware/authMiddleware");
 const validators = require("../../../validators/v1/chat/firebase.validator");
+const logger = require("../../../config/logger");
 
 // Get chat messages (individual chats - legacy support)
 router.get(
@@ -136,11 +137,21 @@ router.post(
           recipient, // recipient user
           task // task object
         );
-        console.log(
-          `✅ Personal chat notification sent: ${sender.firstName} → ${recipient.firstName}`
-        );
+        logger.info("Personal chat notification sent successfully", {
+          file: "routes/v1/chat/firebaseRoutes.js",
+          function: "POST /chats/:taskId/messages",
+          senderName: sender.firstName,
+          recipientName: recipient.firstName,
+          taskId,
+        });
       } catch (notifError) {
-        console.error("Error sending personal chat notification:", notifError);
+        logger.error("Failed to send personal chat notification", {
+          file: "routes/v1/chat/firebaseRoutes.js",
+          function: "POST /chats/:taskId/messages",
+          error: notifError.message,
+          stack: notifError.stack,
+          taskId,
+        });
         // Don't fail the request if notification fails
       }
 
@@ -152,7 +163,13 @@ router.post(
         recipientId: recipient._id,
       });
     } catch (error) {
-      console.error("Error sending personal chat message:", error);
+      logger.error("Error sending personal chat message", {
+        file: "routes/v1/chat/firebaseRoutes.js",
+        function: "POST /chats/:taskId/messages",
+        error: error.message,
+        stack: error.stack,
+        taskId: req.params.taskId,
+      });
       res.status(500).json({ error: error.message });
     }
   }
@@ -216,7 +233,13 @@ router.get(
         participantCount: groupChat.getActiveParticipants().length,
       });
     } catch (error) {
-      console.error("Error fetching group chat messages:", error);
+      logger.error("Error fetching group chat messages", {
+        file: "routes/v1/chat/firebaseRoutes.js",
+        function: "GET /group-chats/:taskId/messages",
+        error: error.message,
+        stack: error.stack,
+        taskId: req.params.taskId,
+      });
       res.status(500).json({ error: error.message });
     }
   }
@@ -307,10 +330,13 @@ router.post(
               task.createdBy
             );
           } catch (notifError) {
-            console.error(
-              "Error sending participant joined notification:",
-              notifError
-            );
+            logger.error("Failed to send participant joined notification", {
+              file: "routes/v1/chat/firebaseRoutes.js",
+              function: "POST /group-chats/:taskId/messages",
+              error: notifError.message,
+              stack: notifError.stack,
+              taskId,
+            });
           }
         }
       }
@@ -376,7 +402,13 @@ router.post(
           messageType
         );
       } catch (notifError) {
-        console.error("Error sending group chat notifications:", notifError);
+        logger.error("Failed to send group chat notifications", {
+          file: "routes/v1/chat/firebaseRoutes.js",
+          function: "POST /group-chats/:taskId/messages",
+          error: notifError.message,
+          stack: notifError.stack,
+          taskId,
+        });
         // Don't fail the request if notifications fail
       }
 
@@ -388,7 +420,13 @@ router.post(
         message: "Message sent successfully",
       });
     } catch (error) {
-      console.error("Error sending group chat message:", error);
+      logger.error("Error sending group chat message", {
+        file: "routes/v1/chat/firebaseRoutes.js",
+        function: "POST /group-chats/:taskId/messages",
+        error: error.message,
+        stack: error.stack,
+        taskId: req.params.taskId,
+      });
       res.status(500).json({ error: error.message });
     }
   }
@@ -449,7 +487,13 @@ router.post(
         message: "System message sent successfully",
       });
     } catch (error) {
-      console.error("Error sending system message:", error);
+      logger.error("Error sending system message", {
+        file: "routes/v1/chat/firebaseRoutes.js",
+        function: "POST /group-chats/:taskId/system-message",
+        error: error.message,
+        stack: error.stack,
+        taskId: req.params.taskId,
+      });
       res.status(500).json({ error: error.message });
     }
   }
@@ -501,7 +545,13 @@ router.get(
         participantCount: activeParticipants.length,
       });
     } catch (error) {
-      console.error("Error fetching participants:", error);
+      logger.error("Error fetching participants", {
+        file: "routes/v1/chat/firebaseRoutes.js",
+        function: "GET /group-chats/:taskId/participants",
+        error: error.message,
+        stack: error.stack,
+        taskId: req.params.taskId,
+      });
       res.status(500).json({ error: error.message });
     }
   }

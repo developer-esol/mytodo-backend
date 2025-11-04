@@ -10,6 +10,7 @@ const {
   generateReceiptsForCompletedTask,
 } = require("../../shared/services/receiptService");
 const notificationService = require("../../shared/services/notificationService");
+const logger = require("../../config/logger");
 
 const isValidObjectId = (id) => {
   return mongoose.Types.ObjectId.isValid(id);
@@ -294,9 +295,17 @@ const completeTaskService = async (taskId, userId) => {
   await taskRepository.completeTask(task);
 
   // Update payment status FIRST
-  console.log(`💳 Updating payment status to completed for task ${taskId}...`);
+  logger.info("Updating payment status to completed", {
+    service: "tasks.services",
+    function: "completeTaskService",
+    taskId,
+  });
   await taskRepository.updatePaymentStatus(taskId, "completed");
-  console.log(`✅ Payment status updated to completed`);
+  logger.info("Payment status updated to completed", {
+    service: "tasks.services",
+    function: "completeTaskService",
+    taskId,
+  });
 
   // Update user vote counts
   await taskRepository.incrementUserCompletedTasks(
@@ -317,9 +326,17 @@ const completeTaskService = async (taskId, userId) => {
 
   // Generate receipts
   try {
-    console.log(`📄 Generating receipts for completed task ${taskId}...`);
+    logger.info("Generating receipts for completed task", {
+      service: "tasks.services",
+      function: "completeTaskService",
+      taskId,
+    });
     await generateReceiptsForCompletedTask(taskId);
-    console.log(`✅ Receipts generated successfully`);
+    logger.info("Receipts generated successfully", {
+      service: "tasks.services",
+      function: "completeTaskService",
+      taskId,
+    });
 
     // Send notifications
     await notificationService.sendTaskCompletionNotification(
@@ -328,8 +345,13 @@ const completeTaskService = async (taskId, userId) => {
       taskId
     );
   } catch (receiptError) {
-    console.error("❌ Error generating receipts:", receiptError);
-    console.error("Stack:", receiptError.stack);
+    logger.error("Error generating receipts", {
+      service: "tasks.services",
+      function: "completeTaskService",
+      taskId,
+      error: receiptError.message,
+      stack: receiptError.stack,
+    });
   }
 
   return task;
@@ -564,7 +586,13 @@ const getTaskWithOffersService = async (taskId) => {
       }
     }
   } catch (error) {
-    console.error("Error formatting date:", error);
+    logger.error("Error formatting date", {
+      service: "tasks.services",
+      function: "getTaskWithOffersService",
+      taskId,
+      error: error.message,
+      rawDateRange: task.dateRange,
+    });
     formattedDate = "Date not available";
     dateDisplay = {
       error: "Unable to format date",

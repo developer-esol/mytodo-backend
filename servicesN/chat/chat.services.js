@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const chatRepository = require("../../repository/chat/chat.repository");
 const { formatUserObject } = require("../../utils/userUtils");
+const logger = require("../../config/logger");
 
 const isValidObjectId = (id) => {
   return id && mongoose.Types.ObjectId.isValid(id);
@@ -53,12 +54,21 @@ const getUserChatsWithTasks = async (userId) => {
     throw new Error("Valid user ID is required");
   }
 
-  console.log("Searching for chats with userId:", userId);
+  logger.debug("Searching for user chats", {
+    service: "chat.services",
+    function: "getUserChatsWithTasks",
+    userId,
+  });
 
   // Find chats
   const chats = await chatRepository.findChatsByUserId(userId);
 
-  console.log("Found chats count:", chats.length);
+  logger.info("Found user chats", {
+    service: "chat.services",
+    function: "getUserChatsWithTasks",
+    userId,
+    chatCount: chats.length,
+  });
 
   // Early return if no chats found
   if (!chats.length) {
@@ -73,7 +83,12 @@ const getUserChatsWithTasks = async (userId) => {
   const taskMap = createTaskMap(tasks);
   const formattedChats = formatChatData(chats, taskMap, userId);
 
-  console.log("Formatted result count:", formattedChats.length);
+  logger.debug("Formatted chat results", {
+    service: "chat.services",
+    function: "getUserChatsWithTasks",
+    userId,
+    resultCount: formattedChats.length,
+  });
 
   return formattedChats;
 };
@@ -124,7 +139,13 @@ const acceptOfferAndUpdateChat = async (updateData) => {
     throw new Error("Chat not found for this task and offer");
   }
 
-  console.log("Chat status updated to 'accept' for taskId:", taskId);
+  logger.info("Chat status updated successfully", {
+    service: "chat.services",
+    function: "acceptOfferAndUpdateChat",
+    taskId,
+    offerId,
+    chatStatus: "accept",
+  });
 
   return updatedChat;
 };

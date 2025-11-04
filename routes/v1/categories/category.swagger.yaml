@@ -1,12 +1,3 @@
-openapi: 3.0.0
-info:
-  title: Category Management API
-  version: 1.0.0
-  description: API endpoints for managing categories, including public access for listing and protected routes for CRUD operations by administrators.
-servers:
-  - url: /api/categories # Assuming the router is mounted here
-    description: Primary API Server
-
 tags:
   - name: Categories
     description: Operations related to product or service categories.
@@ -40,7 +31,7 @@ paths:
       summary: Create a new category (Protected)
       description: Creates a new category. Requires an authenticated Admin user.
       security:
-        - BearerAuth: []
+        - bearerAuth: [] # ← CHANGED from BearerAuth
       requestBody:
         required: true
         content:
@@ -107,7 +98,7 @@ paths:
       summary: Update an existing category by ID (Protected)
       description: Updates an existing category by its MongoDB ID. Requires an authenticated Admin user.
       security:
-        - BearerAuth: []
+        - bearerAuth: [] # ← CHANGED from BearerAuth
       parameters:
         - in: path
           name: id
@@ -146,7 +137,7 @@ paths:
       summary: Delete a category by ID (Protected)
       description: Deletes a category by its MongoDB ID. Requires an authenticated Admin user.
       security:
-        - BearerAuth: []
+        - bearerAuth: [] # ← CHANGED from BearerAuth
       parameters:
         - in: path
           name: id
@@ -176,13 +167,6 @@ paths:
           $ref: "#/components/responses/ServerError"
 
 components:
-  securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: Enter the JWT token (Admin access required for protected routes)
-
   schemas:
     Category:
       type: object

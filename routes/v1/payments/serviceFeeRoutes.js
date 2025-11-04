@@ -9,6 +9,7 @@ const {
 } = require("../../../utils/serviceFee");
 const verifyFirebaseUser = require("../../../middleware/verifyFirebaseUser");
 const validators = require("../../../validators/v1/payments/serviceFee.validator");
+const logger = require("../../../config/logger");
 
 // Calculate service fee for a given amount
 router.post(
@@ -33,7 +34,12 @@ router.post(
         calculation,
       });
     } catch (error) {
-      console.error("Service fee calculation error:", error);
+      logger.error("Service fee calculation error", {
+        file: "routes/v1/payments/serviceFeeRoutes.js",
+        function: "POST /calculate",
+        error: error.message,
+        stack: error.stack,
+      });
       res.status(500).json({
         success: false,
         error: error.message,
@@ -52,7 +58,12 @@ router.get("/config", verifyFirebaseUser, async (req, res) => {
       config,
     });
   } catch (error) {
-    console.error("Get service fee config error:", error);
+    logger.error("Error retrieving service fee config", {
+      file: "routes/v1/payments/serviceFeeRoutes.js",
+      function: "GET /config",
+      error: error.message,
+      stack: error.stack,
+    });
     res.status(500).json({
       success: false,
       error: error.message,
@@ -84,7 +95,12 @@ router.put(
         config: updatedConfig,
       });
     } catch (error) {
-      console.error("Update service fee config error:", error);
+      logger.error("Error updating service fee config", {
+        file: "routes/v1/payments/serviceFeeRoutes.js",
+        function: "PUT /config",
+        error: error.message,
+        stack: error.stack,
+      });
       res.status(500).json({
         success: false,
         error: error.message,
@@ -96,25 +112,20 @@ router.put(
 // Run service fee calculation tests
 router.get("/test", verifyFirebaseUser, async (req, res) => {
   try {
-    // Capture console output
-    const originalLog = console.log;
-    let testOutput = "";
-
-    console.log = (message) => {
-      testOutput += message + "\n";
-    };
-
-    validateServiceFeeCalculation();
-
-    // Restore console.log
-    console.log = originalLog;
+    // Capture logger output for testing
+    const testOutput = validateServiceFeeCalculation();
 
     res.json({
       success: true,
       testOutput,
     });
   } catch (error) {
-    console.error("Service fee test error:", error);
+    logger.error("Service fee test error", {
+      file: "routes/v1/payments/serviceFeeRoutes.js",
+      function: "GET /test",
+      error: error.message,
+      stack: error.stack,
+    });
     res.status(500).json({
       success: false,
       error: error.message,

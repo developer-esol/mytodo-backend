@@ -43,7 +43,7 @@ paths:
         - Chat
       summary: Send a message to a personal chat (legacy)
       security:
-        - BearerAuth: []
+        - bearerAuth: [] # ← Already correct (lowercase 'b')
       parameters:
         - name: taskId
           in: path
@@ -89,7 +89,7 @@ paths:
         - Chat
       summary: Get group chat messages (chronological)
       security:
-        - BearerAuth: []
+        - bearerAuth: []
       parameters:
         - name: taskId
           in: path
@@ -135,7 +135,7 @@ paths:
         - Chat
       summary: Send a message to a group chat
       security:
-        - BearerAuth: []
+        - bearerAuth: []
       parameters:
         - name: taskId
           in: path
@@ -217,7 +217,7 @@ paths:
         - Chat
       summary: Get active participants for a group chat
       security:
-        - BearerAuth: []
+        - bearerAuth: []
       parameters:
         - name: taskId
           in: path
@@ -249,7 +249,7 @@ paths:
 
 components:
   securitySchemes:
-    BearerAuth:
+    bearerAuth: # ← CHANGED from BearerAuth to match global definition
       type: http
       scheme: bearer
       bearerFormat: JWT

@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const reviewRepository = require("../../repository/review/review.repository");
+const logger = require("../../config/logger");
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -122,7 +123,14 @@ const getUserRatingStats = async (userId) => {
   }
 
   user.ratingStats = stats;
-  user.save().catch((err) => console.error("Error caching stats:", err));
+  user.save().catch((err) =>
+    logger.error("Error caching rating stats", {
+      service: "review.services",
+      userId,
+      error: err.message,
+      stack: err.stack,
+    })
+  );
 
   return stats;
 };
@@ -162,26 +170,32 @@ const submitUserReview = async (
   reviewText,
   taskId
 ) => {
-  console.log("📥 Review submission request:", {
+  logger.info("Review submission request received", {
+    service: "review.services",
     userId,
     reviewerId: reviewerId.toString(),
     rating,
-    reviewText: reviewText
-      ? `"${reviewText}" (length: ${reviewText.length})`
-      : "undefined",
+    reviewTextLength: reviewText?.length,
     taskId,
   });
 
   if (!rating || rating < 1 || rating > 5) {
-    console.log("❌ Validation failed: Invalid rating:", rating);
+    logger.warn("Validation failed: Invalid rating", {
+      service: "review.services",
+      rating,
+      userId,
+      reviewerId: reviewerId.toString(),
+    });
     throw new Error("Rating must be between 1 and 5");
   }
 
   if (!reviewText || reviewText.trim().length < 10) {
-    console.log("❌ Validation failed: Review text too short:", {
-      reviewText,
-      length: reviewText?.length,
+    logger.warn("Validation failed: Review text too short", {
+      service: "review.services",
+      reviewTextLength: reviewText?.length,
       trimmedLength: reviewText?.trim().length,
+      userId,
+      reviewerId: reviewerId.toString(),
     });
     throw new Error("Review text must be at least 10 characters");
   }
@@ -219,7 +233,14 @@ const submitUserReview = async (
     reviewerRole: reviewer?.role || "user",
   });
 
-  console.log("✅ Review created successfully:", review._id);
+  logger.info("Review created successfully", {
+    service: "review.services",
+    reviewId: review._id,
+    userId,
+    reviewerId: reviewerId.toString(),
+    rating,
+    taskId,
+  });
 
   return review;
 };

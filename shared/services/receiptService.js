@@ -7,6 +7,7 @@ const Task = require("../../models/task/Task");
 const Offer = require("../../models/task/Offer");
 const Payment = require("../../models/payment/Payment");
 const User = require("../../models/user/User");
+const logger = require("../../config/logger");
 
 /**
  * Tax configuration for different countries
@@ -133,9 +134,14 @@ const generateReceipt = async (taskId, receiptType = "payment") => {
       );
     }
 
-    console.log(
-      `🔍 Receipt generation - Poster ID: ${posterId}, Tasker ID: ${taskerId}`
-    );
+    logger.info("Receipt generation started", {
+      service: "receiptService",
+      function: "generateReceipt",
+      taskId,
+      receiptType,
+      posterId,
+      taskerId,
+    });
 
     // Create receipt data
     const receiptData = {
@@ -214,7 +220,11 @@ const generateReceipt = async (taskId, receiptType = "payment") => {
           sequence
         ).padStart(4, "0")}`;
       } catch (error) {
-        console.error("Error generating receipt number:", error);
+        logger.error("Error generating receipt number", {
+          service: "receiptService",
+          function: "generateReceipt",
+          error: error.message,
+        });
         // Fallback to timestamp-based number
         receiptData.receiptNumber = `MT${Date.now()}`;
       }
@@ -226,7 +236,14 @@ const generateReceipt = async (taskId, receiptType = "payment") => {
 
     return receipt;
   } catch (error) {
-    console.error("Error generating receipt:", error);
+    logger.error("Error generating receipt", {
+      service: "receiptService",
+      function: "generateReceipt",
+      taskId,
+      receiptType,
+      error: error.message,
+      stack: error.stack,
+    });
     throw new Error(`Failed to generate receipt: ${error.message}`);
   }
 };
@@ -467,7 +484,13 @@ const generateReceiptPDF = async (receiptId) => {
 
     return doc;
   } catch (error) {
-    console.error("Error generating PDF receipt:", error);
+    logger.error("Error generating PDF receipt", {
+      service: "receiptService",
+      function: "generateReceiptPDF",
+      receiptId,
+      error: error.message,
+      stack: error.stack,
+    });
     throw new Error(`Failed to generate PDF receipt: ${error.message}`);
   }
 };
@@ -477,16 +500,23 @@ const generateReceiptPDF = async (receiptId) => {
  */
 const generateReceiptsForCompletedTask = async (taskId) => {
   try {
-    console.log(`Generating receipts for completed task: ${taskId}`);
+    logger.info("Generating receipts for completed task", {
+      service: "receiptService",
+      function: "generateReceiptsForCompletedTask",
+      taskId,
+    });
 
     // Check if receipts already exist to prevent duplicates
     const Receipt = require("../models/payment/Receipt");
     const existingReceipts = await Receipt.find({ task: taskId });
 
     if (existingReceipts.length > 0) {
-      console.log(
-        `⚠️ Receipts already exist for task ${taskId}, returning existing ones`
-      );
+      logger.warn("Receipts already exist for task, returning existing ones", {
+        service: "receiptService",
+        function: "generateReceiptsForCompletedTask",
+        taskId,
+        existingCount: existingReceipts.length,
+      });
       const paymentReceipt = existingReceipts.find(
         (r) => r.receiptType === "payment"
       );
@@ -502,18 +532,34 @@ const generateReceiptsForCompletedTask = async (taskId) => {
 
     // Generate payment receipt for poster (person who paid)
     const paymentReceipt = await generateReceipt(taskId, "payment");
-    console.log(`Payment receipt generated: ${paymentReceipt.receiptNumber}`);
+    logger.info("Payment receipt generated", {
+      service: "receiptService",
+      function: "generateReceiptsForCompletedTask",
+      taskId,
+      receiptNumber: paymentReceipt.receiptNumber,
+    });
 
     // Generate earnings receipt for tasker (person who did the work)
     const earningsReceipt = await generateReceipt(taskId, "earnings");
-    console.log(`Earnings receipt generated: ${earningsReceipt.receiptNumber}`);
+    logger.info("Earnings receipt generated", {
+      service: "receiptService",
+      function: "generateReceiptsForCompletedTask",
+      taskId,
+      receiptNumber: earningsReceipt.receiptNumber,
+    });
 
     return {
       paymentReceipt,
       earningsReceipt,
     };
   } catch (error) {
-    console.error("Error generating receipts for completed task:", error);
+    logger.error("Error generating receipts for completed task", {
+      service: "receiptService",
+      function: "generateReceiptsForCompletedTask",
+      taskId,
+      error: error.message,
+      stack: error.stack,
+    });
     throw error;
   }
 };
@@ -539,7 +585,14 @@ const getUserReceipts = async (userId, receiptType = null) => {
 
     return receipts;
   } catch (error) {
-    console.error("Error fetching user receipts:", error);
+    logger.error("Error fetching user receipts", {
+      service: "receiptService",
+      function: "getUserReceipts",
+      userId,
+      receiptType,
+      error: error.message,
+      stack: error.stack,
+    });
     throw error;
   }
 };

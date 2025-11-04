@@ -9,6 +9,7 @@ const User = require("../../../models/user/User");
 const PasswordReset = require("../../../models/user/PasswordReset");
 const AuthValidator = require("../../../validators/v1/auth/auth.validator");
 const { auth } = require("firebase-admin");
+const logger = require("../../../config/logger");
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Email Transporter Configuration (reuse from UserRoutes pattern)
@@ -94,7 +95,12 @@ router.post("/google", AuthValidator.googleAuth, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Google auth error:", error);
+    logger.error("Google authentication failed", {
+      route: "Auth.js",
+      endpoint: "/google",
+      error: error.message,
+      stack: error.stack,
+    });
     res.status(500).json({
       success: false,
       error: "Google authentication failed",
@@ -110,7 +116,11 @@ router.post(
     try {
       const { email } = req.body;
 
-      console.log("Forgot password request received for email:", email);
+      logger.info("Forgot password request received", {
+        route: "Auth.js",
+        endpoint: "/forgot-password",
+        email,
+      });
 
       // Validate email
       if (!email) {
@@ -124,7 +134,11 @@ router.post(
       const user = await User.findOne({ email });
       if (!user) {
         // Don't reveal if user exists or not for security
-        console.log("User not found for email:", email);
+        logger.info("User not found for password reset", {
+          route: "Auth.js",
+          endpoint: "/forgot-password",
+          email,
+        });
         return res.status(200).json({
           success: true,
           message:
@@ -132,7 +146,12 @@ router.post(
         });
       }
 
-      console.log("User found, generating reset token for:", email);
+      logger.info("User found, generating reset token", {
+        route: "Auth.js",
+        endpoint: "/forgot-password",
+        email,
+        userId: user._id,
+      });
 
       // Generate reset token
       const resetToken = crypto.randomBytes(32).toString("hex");
@@ -152,7 +171,12 @@ router.post(
         userId: user._id,
       });
 
-      console.log("Reset token saved to database");
+      logger.info("Reset token saved to database", {
+        route: "Auth.js",
+        endpoint: "/forgot-password",
+        email,
+        userId: user._id,
+      });
 
       // Create reset URL matching frontend's expected format (Vite default port)
       const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
@@ -160,14 +184,26 @@ router.post(
         email
       )}`;
 
-      console.log("Reset URL generated:", resetURL);
+      logger.info("Reset URL generated", {
+        route: "Auth.js",
+        endpoint: "/forgot-password",
+        email,
+      });
 
       // Verify transporter configuration
       try {
         await transporter.verify();
-        console.log("Email transporter verified successfully");
+        logger.info("Email transporter verified successfully", {
+          route: "Auth.js",
+          endpoint: "/forgot-password",
+        });
       } catch (verifyError) {
-        console.error("Email transporter verification failed:", verifyError);
+        logger.error("Email transporter verification failed", {
+          route: "Auth.js",
+          endpoint: "/forgot-password",
+          error: verifyError.message,
+          stack: verifyError.stack,
+        });
         return res.status(500).json({
           success: false,
           message: "Email service configuration error",
@@ -203,12 +239,27 @@ router.post(
         `,
         };
 
-        console.log("Attempting to send email to:", email);
+        logger.info("Attempting to send reset password email", {
+          route: "Auth.js",
+          endpoint: "/forgot-password",
+          email,
+        });
         const info = await transporter.sendMail(mailOptions);
-        console.log("Email sent successfully:", info.messageId);
-        console.log("Email response:", info.response);
+        logger.info("Reset password email sent successfully", {
+          route: "Auth.js",
+          endpoint: "/forgot-password",
+          email,
+          messageId: info.messageId,
+          response: info.response,
+        });
       } catch (emailError) {
-        console.error("Email sending failed:", emailError);
+        logger.error("Email sending failed", {
+          route: "Auth.js",
+          endpoint: "/forgot-password",
+          email,
+          error: emailError.message,
+          stack: emailError.stack,
+        });
         return res.status(500).json({
           success: false,
           message: "Failed to send reset email. Please try again later.",
@@ -221,7 +272,12 @@ router.post(
           "If your email is registered, you will receive a password reset link",
       });
     } catch (error) {
-      console.error("Forgot password error:", error);
+      logger.error("Forgot password error", {
+        route: "Auth.js",
+        endpoint: "/forgot-password",
+        error: error.message,
+        stack: error.stack,
+      });
       res.status(500).json({
         success: false,
         message: "Internal server error",
@@ -238,7 +294,9 @@ router.post(
     try {
       const { token, email, newPassword } = req.body;
 
-      console.log("Reset password attempt:", {
+      logger.info("Reset password attempt", {
+        route: "Auth.js",
+        endpoint: "/reset-password",
         email,
         hasToken: !!token,
         hasPassword: !!newPassword,
@@ -260,12 +318,11 @@ router.post(
         });
       }
 
-      console.log(
-        "Attempting password reset with token:",
-        token,
-        "for email:",
-        email
-      );
+      logger.info("Validating reset token", {
+        route: "Auth.js",
+        endpoint: "/reset-password",
+        email,
+      });
 
       // Find the reset token
       const resetRecord = await PasswordReset.findOne({
@@ -273,7 +330,12 @@ router.post(
         tokenExpires: { $gt: new Date() },
       });
 
-      console.log("Reset record found:", resetRecord ? "Yes" : "No");
+      logger.info("Reset record lookup completed", {
+        route: "Auth.js",
+        endpoint: "/reset-password",
+        email,
+        found: !!resetRecord,
+      });
 
       if (!resetRecord) {
         return res.status(400).json({
@@ -328,7 +390,13 @@ router.post(
         `,
         });
       } catch (emailError) {
-        console.error("Confirmation email error:", emailError);
+        logger.error("Confirmation email error", {
+          route: "Auth.js",
+          endpoint: "/reset-password",
+          email,
+          error: emailError.message,
+          stack: emailError.stack,
+        });
         // Don't fail the password reset if confirmation email fails
       }
 
@@ -338,7 +406,12 @@ router.post(
           "Password reset successful. You can now log in with your new password.",
       });
     } catch (error) {
-      console.error("Reset password error:", error);
+      logger.error("Reset password error", {
+        route: "Auth.js",
+        endpoint: "/reset-password",
+        error: error.message,
+        stack: error.stack,
+      });
       res.status(500).json({
         success: false,
         message: "Internal server error",
@@ -382,7 +455,12 @@ router.post(
         message: isValidToken ? "Token is valid" : "Invalid reset token",
       });
     } catch (error) {
-      console.error("Token validation error:", error);
+      logger.error("Token validation error", {
+        route: "Auth.js",
+        endpoint: "/validate-reset-token",
+        error: error.message,
+        stack: error.stack,
+      });
       return res.status(500).json({
         valid: false,
         message: "Error validating token",
@@ -399,7 +477,11 @@ router.post(
     try {
       const { email } = req.body;
 
-      console.log("Resend forgot password request received for email:", email);
+      logger.info("Resend forgot password request received", {
+        route: "Auth.js",
+        endpoint: "/resend-forgot-password",
+        email,
+      });
 
       // Validate email
       if (!email) {
@@ -413,7 +495,11 @@ router.post(
       const user = await User.findOne({ email });
       if (!user) {
         // Don't reveal if user exists or not for security
-        console.log("User not found for resend request:", email);
+        logger.info("User not found for resend request", {
+          route: "Auth.js",
+          endpoint: "/resend-forgot-password",
+          email,
+        });
         return res.status(200).json({
           success: true,
           message:
@@ -421,7 +507,12 @@ router.post(
         });
       }
 
-      console.log("User found, generating new reset token for:", email);
+      logger.info("User found, generating new reset token", {
+        route: "Auth.js",
+        endpoint: "/resend-forgot-password",
+        email,
+        userId: user._id,
+      });
 
       // Generate new reset token
       const resetToken = crypto.randomBytes(32).toString("hex");
@@ -441,14 +532,23 @@ router.post(
         userId: user._id,
       });
 
-      console.log("New reset token saved to database");
+      logger.info("New reset token saved to database", {
+        route: "Auth.js",
+        endpoint: "/resend-forgot-password",
+        email,
+        userId: user._id,
+      });
 
       // Create reset URL (using Vite's default port)
       const resetURL = `${
         process.env.FRONTEND_URL || "http://localhost:5173"
       }/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
 
-      console.log("New reset URL generated:", resetURL);
+      logger.info("New reset URL generated", {
+        route: "Auth.js",
+        endpoint: "/resend-forgot-password",
+        email,
+      });
 
       // Send reset email
       try {
@@ -479,12 +579,27 @@ router.post(
         `,
         };
 
-        console.log("Attempting to resend email to:", email);
+        logger.info("Attempting to resend reset password email", {
+          route: "Auth.js",
+          endpoint: "/resend-forgot-password",
+          email,
+        });
         const info = await transporter.sendMail(mailOptions);
-        console.log("Resend email sent successfully:", info.messageId);
-        console.log("Resend email response:", info.response);
+        logger.info("Resend email sent successfully", {
+          route: "Auth.js",
+          endpoint: "/resend-forgot-password",
+          email,
+          messageId: info.messageId,
+          response: info.response,
+        });
       } catch (emailError) {
-        console.error("Resend email sending failed:", emailError);
+        logger.error("Resend email sending failed", {
+          route: "Auth.js",
+          endpoint: "/resend-forgot-password",
+          email,
+          error: emailError.message,
+          stack: emailError.stack,
+        });
         return res.status(500).json({
           success: false,
           message: "Failed to resend reset email. Please try again later.",
@@ -497,7 +612,12 @@ router.post(
           "If your email is registered, you will receive a new password reset link",
       });
     } catch (error) {
-      console.error("Resend forgot password error:", error);
+      logger.error("Resend forgot password error", {
+        route: "Auth.js",
+        endpoint: "/resend-forgot-password",
+        error: error.message,
+        stack: error.stack,
+      });
       res.status(500).json({
         success: false,
         message: "Internal server error",
@@ -513,12 +633,17 @@ setInterval(async () => {
       tokenExpires: { $lt: new Date() },
     });
     if (result.deletedCount > 0) {
-      console.log(
-        `Cleaned up ${result.deletedCount} expired password reset tokens`
-      );
+      logger.info("Cleaned up expired password reset tokens", {
+        route: "Auth.js",
+        deletedCount: result.deletedCount,
+      });
     }
   } catch (error) {
-    console.error("Error cleaning up expired password reset tokens:", error);
+    logger.error("Error cleaning up expired password reset tokens", {
+      route: "Auth.js",
+      error: error.message,
+      stack: error.stack,
+    });
   }
 }, 60 * 60 * 1000); // Run every hour
 

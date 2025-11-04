@@ -22,7 +22,7 @@ paths:
       tags:
         - Payments
       security:
-        - BearerAuth: []
+        - bearerAuth: [] # ← CHANGED from BearerAuth
       requestBody:
         required: true
         content:
@@ -134,7 +134,7 @@ paths:
       tags:
         - Payments
       security:
-        - BearerAuth: []
+        - bearerAuth: [] # ← CHANGED from BearerAuth
       requestBody:
         required: true
         content:
@@ -193,7 +193,7 @@ paths:
       tags:
         - Payments
       security:
-        - BearerAuth: []
+        - bearerAuth: [] # ← CHANGED from BearerAuth
       parameters:
         - in: path
           name: taskId
@@ -258,12 +258,6 @@ paths:
                     example: Failed to confirm task completion
 
 components:
-  securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-
   schemas:
     Payment:
       type: object

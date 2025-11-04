@@ -19,7 +19,7 @@ paths:
       tags:
         - Service Fee
       security:
-        - BearerAuth: []
+        - bearerAuth: [] # ← CHANGED from BearerAuth
       requestBody:
         required: true
         content:
@@ -91,7 +91,7 @@ paths:
       tags:
         - Service Fee
       security:
-        - BearerAuth: []
+        - bearerAuth: [] # ← CHANGED from BearerAuth
       responses:
         "200":
           description: Current service fee configuration
@@ -115,7 +115,7 @@ paths:
       tags:
         - Service Fee
       security:
-        - BearerAuth: []
+        - bearerAuth: [] # ← CHANGED from BearerAuth
       requestBody:
         required: true
         content:
@@ -175,7 +175,7 @@ paths:
       tags:
         - Service Fee
       security:
-        - BearerAuth: []
+        - bearerAuth: [] # ← CHANGED from BearerAuth
       responses:
         "200":
           description: Test results
@@ -196,12 +196,6 @@ paths:
           $ref: "#/components/responses/ServerError"
 
 components:
-  securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-
   schemas:
     ServiceFeeConfig:
       type: object

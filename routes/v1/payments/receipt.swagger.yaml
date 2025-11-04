@@ -20,7 +20,7 @@ paths:
       tags:
         - Receipts
       security:
-        - BearerAuth: []
+        - bearerAuth: [] # ← CHANGED from BearerAuth
       parameters:
         - in: query
           name: receiptType
@@ -77,7 +77,7 @@ paths:
       tags:
         - Receipts
       security:
-        - BearerAuth: []
+        - bearerAuth: [] # ← CHANGED from BearerAuth
       parameters:
         - in: path
           name: taskId
@@ -149,7 +149,7 @@ paths:
       tags:
         - Receipts
       security:
-        - BearerAuth: []
+        - bearerAuth: [] # ← CHANGED from BearerAuth
       parameters:
         - in: path
           name: receiptId
@@ -208,7 +208,7 @@ paths:
       tags:
         - Receipts
       security:
-        - BearerAuth: []
+        - bearerAuth: [] # ← CHANGED from BearerAuth
       parameters:
         - in: path
           name: receiptId
@@ -262,12 +262,6 @@ paths:
           $ref: "#/components/responses/ServerError"
 
 components:
-  securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-
   schemas:
     ReceiptSummary:
       type: object

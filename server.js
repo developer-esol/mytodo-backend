@@ -97,13 +97,20 @@ connectDB()
 
     // Socket.io connection handling
     io.on("connection", (socket) => {
-      console.log(`🔗 User connected: ${socket.id}`);
+      logger.info("User connected to Socket.io", {
+        file: "server.js",
+        socketId: socket.id,
+      });
 
       // Handle user joining their notification room
       socket.on("join-user-room", (userId) => {
         if (userId) {
           socket.join(`user_${userId}`);
-          console.log(`👤 User ${userId} joined their notification room`);
+          logger.info("User joined notification room", {
+            file: "server.js",
+            userId,
+            socketId: socket.id,
+          });
 
           // Send confirmation
           socket.emit("room-joined", {
@@ -116,11 +123,12 @@ connectDB()
       // Handle sound preference updates
       socket.on("update-sound-preference", (data) => {
         const { userId, soundEnabled } = data;
-        console.log(
-          `🔊 User ${userId} sound preference: ${
-            soundEnabled ? "enabled" : "disabled"
-          }`
-        );
+        logger.info("User sound preference updated", {
+          file: "server.js",
+          userId,
+          soundEnabled,
+          socketId: socket.id,
+        });
 
         // Store preference in socket session
         socket.soundEnabled = soundEnabled;
@@ -129,7 +137,10 @@ connectDB()
 
       // Handle disconnection
       socket.on("disconnect", () => {
-        console.log(`❌ User disconnected: ${socket.id}`);
+        logger.info("User disconnected from Socket.io", {
+          file: "server.js",
+          socketId: socket.id,
+        });
       });
 
       // Handle test notification request
@@ -167,5 +178,3 @@ connectDB()
     });
     process.exit(1);
   });
-
-

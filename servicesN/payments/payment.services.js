@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const paymentRepository = require("../../repository/payment/payment.repository");
 const { calculateServiceFee } = require("../../utils/serviceFee");
+const logger = require("../../config/logger");
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -31,11 +32,14 @@ const createPaymentIntent = async (userId, taskId, offerId) => {
 
   const serviceFeeCalculation = calculateServiceFee(budgetAmount, taskCurrency);
 
-  console.log("Payment calculation:", {
+  logger.info("Payment calculation completed", {
+    service: "payment.services",
+    function: "createPaymentIntent",
     budget: budgetAmount,
     currency: taskCurrency,
-    serviceFeeDetails: serviceFeeCalculation,
+    serviceFee: serviceFeeCalculation.serviceFee,
     offerAmount: offerAmount,
+    totalAmount: serviceFeeCalculation.totalAmount,
   });
 
   const totalChargeInCents = Math.round(
