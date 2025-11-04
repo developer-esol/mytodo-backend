@@ -44,14 +44,14 @@ const options = {
     "./routes/v1/reviews/review.swagger.yaml",
     "./routes/v1/tasks/task.swagger.yaml",
     "./routes/v1/users/userRoutes.swagger.yaml",
-    "./routes/v1/users/userReviewRoutes.swagger.yaml",
+    "./routes/v1/users/userReview.swagger.yaml",
   ],
 };
 
 const swaggerSpec = swaggerJsDoc(options);
 
 function swaggerDocs(app, port) {
-  // Swagger UI configuration
+  // Swagger UI configuration with explicit HTTP scheme
   const swaggerOptions = {
     explorer: true,
     swaggerOptions: {
@@ -65,15 +65,46 @@ function swaggerDocs(app, port) {
           name: "Local Server",
         },
       ],
+      // Force HTTP scheme for all assets and API calls
+      validatorUrl: null, // Disable validator to prevent HTTPS calls
+      supportedSubmitMethods: ["get", "post", "put", "delete", "patch"],
+      // Explicitly set the base URL scheme to HTTP
+      ...(process.env.NODE_ENV === "production" && {
+        url: `http://134.199.172.167:5001/api-docs/swagger.json`,
+      }),
     },
+    // Custom CSS to ensure no HTTPS asset loading
+    customCss: `
+      .swagger-ui .topbar { display: none }
+    `,
+    customSiteTitle: "MyToDoo API Documentation",
+    // Explicitly set HTTP scheme
+    swaggerUrl:
+      process.env.NODE_ENV === "production"
+        ? `http://134.199.172.167:5001/api-docs/swagger.json`
+        : `http://localhost:5001/api-docs/swagger.json`,
   };
+
+  // Add middleware to force HTTP headers for Swagger routes
+  app.use("/api-docs", (req, res, next) => {
+    // Prevent any HTTPS upgrade headers
+    res.removeHeader("Strict-Transport-Security");
+    res.setHeader(
+      "Content-Security-Policy",
+      "default-src 'self' 'unsafe-inline' 'unsafe-eval' http: https: data: blob:"
+    );
+    next();
+  });
 
   app.use("/api-docs", swaggerUi.serve);
   app.get("/api-docs", swaggerUi.setup(swaggerSpec, swaggerOptions));
 
-  // Serve swagger spec as JSON
+  // Serve swagger spec as JSON with explicit HTTP headers
   app.get("/api-docs/swagger.json", (req, res) => {
+    res.removeHeader("Strict-Transport-Security");
     res.setHeader("Content-Type", "application/json");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Access-Control-Allow-Origin", "*");
     res.send(swaggerSpec);
   });
 

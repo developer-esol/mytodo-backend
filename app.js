@@ -64,7 +64,22 @@ app.use(
 );
 
 // Rest of middleware
-app.use(helmet());
+// Configure Helmet for HTTP (disable HTTPS-forcing headers)
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:", "http:", "https:"],
+        connectSrc: ["'self'", "http:", "https:"],
+        upgradeInsecureRequests: null, // Disable automatic HTTPS upgrade
+      },
+    },
+    hsts: false, // Disable HTTP Strict Transport Security
+  })
+);
 
 // Serve static files from public directory with CORS headers
 app.use(
@@ -201,12 +216,12 @@ app.use("/api", userReviewRoutes); // User-based review routes (new system)
 
 // swagger integration
 const swaggerDocs = require("./swagger");
-swaggerDocs(app);
+swaggerDocs(app, process.env.PORT || 5001);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
   logger.error("Unhandled error:", {
-      file: "app.js",
+    file: "app.js",
     error: err.message,
     stack: err.stack,
     path: req.path,
@@ -219,5 +234,3 @@ app.use((err, req, res, next) => {
 });
 
 module.exports = app;
-
-
