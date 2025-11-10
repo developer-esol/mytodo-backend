@@ -308,7 +308,7 @@ class UserController {
           });
           return res.status(400).json({
             success: false,
-            message: "File size too large. Maximum size is 1MB.",
+            message: "File size too large. Maximum size is 5MB.",
           });
         }
       }

@@ -242,6 +242,65 @@ const getUserTasks = [
   validateRequest,
 ];
 
+// Search tasks validator
+const searchTasks = [
+  query("q").optional().isString().withMessage("q must be a string"),
+  query("search").optional().isString().withMessage("search must be a string"),
+  query("categories")
+    .optional()
+    .isString()
+    .withMessage("categories must be a string or CSV"),
+  query("category")
+    .optional()
+    .isString()
+    .withMessage("category must be a string"),
+  query("location")
+    .optional()
+    .isString()
+    .withMessage("location must be a string"),
+  query("minPrice").optional().isString(),
+  query("maxPrice").optional().isString(),
+  query("minBudget").optional().isString(),
+  query("maxBudget").optional().isString(),
+  query("status")
+    .optional()
+    .isIn([
+      "open",
+      "assigned",
+      "in-progress",
+      "completed",
+      "cancelled",
+      "expired",
+    ])
+    .withMessage("Invalid status value"),
+  query("sort")
+    .optional()
+    .isIn([
+      "recommended",
+      "newest",
+      "newest_first",
+      "oldest",
+      "oldest_first",
+      "lowest_budget",
+      "highest_budget",
+    ])
+    .withMessage("Invalid sort option"),
+  validateRequest,
+];
+
+// Similar offer tasks validator
+const getSimilarOfferTasks = [
+  param("id")
+    .matches(/^[0-9a-fA-F]{24}$/)
+    .withMessage("Invalid task ID format"),
+  query("limit")
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage("Limit must be between 1 and 50"),
+  query("q").optional().isString().withMessage("Query must be a string"),
+  validateRequest,
+];
+
 const getMyTasks = [
   query("status")
     .optional()
@@ -281,4 +340,6 @@ module.exports = {
   answerQuestion,
   getUserTasks,
   getMyTasks,
+  searchTasks,
+  getSimilarOfferTasks,
 };

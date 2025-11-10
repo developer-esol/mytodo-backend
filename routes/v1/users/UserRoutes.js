@@ -12,7 +12,7 @@ const router = express.Router();
 const avatarUpload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 1 * 1024 * 1024, // 1MB limit to prevent large base64 strings
+    fileSize: 5 * 1024 * 1024, // 5MB limit (stored on S3, no base64 persistence)
   },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith("image/")) {
