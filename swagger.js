@@ -1,3 +1,4 @@
+const path = require("path");
 const swaggerJsDoc = require("swagger-jsdoc");
 const swaggerUi = require("swagger-ui-express");
 const logger = require("./config/logger");
@@ -10,22 +11,29 @@ const options = {
       version: "1.0.0",
       description: "API documentation for MyToDoo application",
     },
-    servers: [
-      {
-        url:
-          process.env.NODE_ENV === "production"
-            ? `http://134.199.172.167:5001/api`
-            : `http://localhost:5001/api`,
-        description:
-          process.env.NODE_ENV === "production"
-            ? "Production server"
-            : "Development server",
-      },
-      {
-        url: `http://134.199.172.167:5001/api`,
-        description: "Development server (HTTP)",
-      },
-    ],
+    // Include both servers so you can switch in Swagger UI; order depends on environment
+    servers:
+      process.env.NODE_ENV === "production"
+        ? [
+            {
+              url: `http://134.199.172.167:5001/api`,
+              description: "Production server",
+            },
+            {
+              url: `http://localhost:5001/api`,
+              description: "Local development server",
+            },
+          ]
+        : [
+            {
+              url: `http://localhost:5001/api`,
+              description: "Local development server",
+            },
+            {
+              url: `http://134.199.172.167:5001/api`,
+              description: "Production server",
+            },
+          ],
     components: {
       securitySchemes: {
         bearerAuth: {
@@ -48,21 +56,10 @@ const options = {
       },
     ],
   },
+  // Load all YAML files automatically and manually specify route files
   apis: [
-    "./routes/v1/users/userRoutes.swagger.yaml",
-    "./routes/v1/auth/auth.swagger.yaml",
-    "./routes/v1/auth/twoFactorAuth.swagger.yaml",
-    "./routes/v1/categories/category.swagger.yaml",
-    "./routes/v1/chat/chat.swagger.yaml",
-    "./routes/v1/chat/firebase.swagger.yaml",
-    "./routes/v1/notifications/notifications.swagger.yaml",
-    "./routes/v1/payments/payment.swagger.yaml",
-    "./routes/v1/payments/receipt.swagger.yaml",
-    "./routes/v1/payments/serviceFee.swagger.yaml",
-    "./routes/v1/reviews/review.swagger.yaml",
-    "./routes/v1/tasks/task.swagger.yaml",
-    "./routes/v1/users/userReview.swagger.yaml",
-    "./routes/v1/admin/admin.swagger.yaml",
+    path.join(__dirname, "routes/v1/**/*.swagger.yaml"),
+    path.join(__dirname, "routes/v1/**/*.js"),
   ],
 };
 
@@ -73,34 +70,14 @@ function swaggerDocs(app, port) {
   const swaggerOptions = {
     explorer: true,
     swaggerOptions: {
-      urls: [
-        {
-          url: `http://134.199.172.167:5001/api-docs/swagger.json`,
-          name: "Production Server (HTTP)",
-        },
-        {
-          url: `http://localhost:5001/api-docs/swagger.json`,
-          name: "Local Server",
-        },
-      ],
-      // Force HTTP scheme for all assets and API calls
-      validatorUrl: null, // Disable validator to prevent HTTPS calls
+      // Do not force a remote JSON; we pass the spec directly below
+      validatorUrl: null,
       supportedSubmitMethods: ["get", "post", "put", "delete", "patch"],
-      // Explicitly set the base URL scheme to HTTP
-      ...(process.env.NODE_ENV === "production" && {
-        url: `http://134.199.172.167:5001/api-docs/swagger.json`,
-      }),
     },
-    // Custom CSS to ensure no HTTPS asset loading
     customCss: `
       .swagger-ui .topbar { display: none }
     `,
     customSiteTitle: "MyToDoo API Documentation",
-    // Explicitly set HTTP scheme
-    swaggerUrl:
-      process.env.NODE_ENV === "production"
-        ? `http://134.199.172.167:5001/api-docs/swagger.json`
-        : `http://localhost:5001/api-docs/swagger.json`,
   };
 
   // Add middleware to force HTTP headers for Swagger routes

@@ -625,6 +625,125 @@ const getTaskWithOffersService = async (taskId) => {
   };
 };
 
+/**
+ * Get similar tasks that have offers, based on categories and optional text query.
+ * - Matches any overlapping category with the source task
+ * - Excludes the provided taskId
+ * - Ensures tasks have at least one offer
+ * - Optional q: matches task title or creator name (first/last)
+ * @param {String} taskId
+ * @param {Object} options
+ * @param {String} [options.q]
+ * @param {Number} [options.limit=10]
+ */
+const getSimilarOfferTasksService = async (taskId, { q, limit = 10 } = {}) => {
+  if (!isValidObjectId(taskId)) {
+    throw new Error("Invalid task ID");
+  }
+
+  const source = await taskRepository.findTaskByIdWithFullUsers(taskId);
+  if (!source) throw new Error("Task not found");
+
+  // Normalize categories to array of strings
+  const categories = Array.isArray(source.categories)
+    ? source.categories
+    : typeof source.categories === "string"
+    ? source.categories
+        .split(",")
+        .map((c) => c.trim())
+        .filter(Boolean)
+    : [];
+
+  const matchStage = {
+    _id: { $ne: source._id },
+    status: { $in: ["open", "assigned", "in-progress"] },
+  };
+  if (categories.length) {
+    matchStage.categories = { $in: categories };
+  }
+
+  const pipeline = [
+    { $match: matchStage },
+    {
+      $lookup: {
+        from: "offers",
+        localField: "_id",
+        foreignField: "taskId",
+        as: "offers",
+      },
+    },
+    {
+      $addFields: { offerCount: { $size: "$offers" } },
+    },
+    { $match: { offerCount: { $gt: 0 } } },
+    {
+      $lookup: {
+        from: "users",
+        localField: "createdBy",
+        foreignField: "_id",
+        as: "creator",
+      },
+    },
+    { $addFields: { creator: { $arrayElemAt: ["$creator", 0] } } },
+  ];
+
+  if (q && typeof q === "string" && q.trim()) {
+    const term = q.trim();
+    pipeline.push({
+      $match: {
+        $or: [
+          { title: { $regex: term, $options: "i" } },
+          { "creator.firstName": { $regex: term, $options: "i" } },
+          { "creator.lastName": { $regex: term, $options: "i" } },
+        ],
+      },
+    });
+  } else if (source.title) {
+    // If no explicit query, derive keywords from source title (basic split)
+    const words = String(source.title)
+      .split(/\s+/)
+      .map((w) => w.replace(/[^\p{L}\p{N}]/gu, ""))
+      .filter((w) => w.length >= 3)
+      .slice(0, 5);
+
+    if (words.length) {
+      pipeline.push({
+        $match: {
+          $or: words.map((w) => ({ title: { $regex: w, $options: "i" } })),
+        },
+      });
+    }
+  }
+
+  pipeline.push(
+    { $sort: { offerCount: -1, createdAt: -1 } },
+    { $limit: Math.min(Number(limit) || 10, 50) },
+    {
+      $project: {
+        _id: 1,
+        title: 1,
+        categories: 1,
+        budget: 1,
+        currency: 1,
+        status: 1,
+        images: 1,
+        createdAt: 1,
+        offerCount: 1,
+        createdBy: {
+          _id: "$creator._id",
+          firstName: "$creator.firstName",
+          lastName: "$creator.lastName",
+          avatar: "$creator.avatar",
+        },
+      },
+    }
+  );
+
+  const Task = require("../../models/task/Task");
+  const results = await Task.aggregate(pipeline);
+  return results;
+};
+
 module.exports = {
   getMyTasksWithOffers,
   updateTaskStatusService,
@@ -634,4 +753,5 @@ module.exports = {
   cancelTaskService,
   acceptOfferService,
   getTaskWithOffersService,
+  getSimilarOfferTasksService,
 };

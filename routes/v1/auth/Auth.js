@@ -3,28 +3,14 @@ const router = express.Router();
 const { OAuth2Client } = require("google-auth-library");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const User = require("../../../models/user/User");
 const PasswordReset = require("../../../models/user/PasswordReset");
 const AuthValidator = require("../../../validators/v1/auth/auth.validator");
 const { auth } = require("firebase-admin");
 const logger = require("../../../config/logger");
+const emailService = require("../../../shared/services/email.service");
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
-// Email Transporter Configuration (reuse from UserRoutes pattern)
-const transporter = nodemailer.createTransport({
-  service: "Gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false,
-  },
-  debug: true, // Enable debug logs
-  logger: true, // Enable logger
-});
 
 // Google Authentication route
 router.post("/google", AuthValidator.googleAuth, async (req, res) => {
@@ -190,9 +176,9 @@ router.post(
         email,
       });
 
-      // Verify transporter configuration
+      // Verify email transporter configuration
       try {
-        await transporter.verify();
+        await emailService.verifyConnection();
         logger.info("Email transporter verified successfully", {
           route: "Auth.js",
           endpoint: "/forgot-password",
@@ -212,39 +198,16 @@ router.post(
 
       // Send reset email
       try {
-        const mailOptions = {
-          to: email,
-          subject: "Password Reset Request",
-          text: `You requested a password reset. Click the link below to reset your password:\n\n${resetURL}\n\nThis link expires in 15 minutes.\n\nIf you didn't request this, please ignore this email.`,
-          html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2>Password Reset Request</h2>
-            <p>You requested a password reset for your account.</p>
-            <p>Click the button below to reset your password:</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${resetURL}" 
-                 style="background-color: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
-                Reset Password
-              </a>
-            </div>
-            <p style="color: #666; font-size: 14px;">
-              This link expires in 15 minutes.<br>
-              If you didn't request this password reset, please ignore this email.
-            </p>
-            <p style="color: #666; font-size: 12px;">
-              If the button doesn't work, copy and paste this link into your browser:<br>
-              ${resetURL}
-            </p>
-          </div>
-        `,
-        };
-
         logger.info("Attempting to send reset password email", {
           route: "Auth.js",
           endpoint: "/forgot-password",
           email,
         });
-        const info = await transporter.sendMail(mailOptions);
+        const info = await emailService.sendPasswordResetEmail({
+          email,
+          resetUrl: resetURL,
+          context: { route: "Auth.js", endpoint: "/forgot-password" },
+        });
         logger.info("Reset password email sent successfully", {
           route: "Auth.js",
           endpoint: "/forgot-password",
@@ -374,20 +337,9 @@ router.post(
 
       // Send confirmation email
       try {
-        await transporter.sendMail({
-          to: email,
-          subject: "Password Reset Successful",
-          text: `Your password has been successfully reset. If you didn't make this change, please contact support immediately.`,
-          html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2>Password Reset Successful</h2>
-            <p>Your password has been successfully reset.</p>
-            <p>If you didn't make this change, please contact support immediately.</p>
-            <p style="color: #666; font-size: 14px;">
-              This is an automated message, please do not reply to this email.
-            </p>
-          </div>
-        `,
+        await emailService.sendPasswordResetConfirmationEmail({
+          email,
+          context: { route: "Auth.js", endpoint: "/reset-password" },
         });
       } catch (emailError) {
         logger.error("Confirmation email error", {
@@ -552,39 +504,20 @@ router.post(
 
       // Send reset email
       try {
-        const mailOptions = {
-          to: email,
-          subject: "Password Reset Request (Resent)",
-          text: `You requested a password reset. Click the link below to reset your password:\n\n${resetURL}\n\nThis link expires in 15 minutes.\n\nIf you didn't request this, please ignore this email.`,
-          html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2>Password Reset Request (Resent)</h2>
-            <p>You requested a password reset for your account.</p>
-            <p>Click the button below to reset your password:</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${resetURL}" 
-                 style="background-color: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
-                Reset Password
-              </a>
-            </div>
-            <p style="color: #666; font-size: 14px;">
-              This link expires in 15 minutes.<br>
-              If you didn't request this password reset, please ignore this email.
-            </p>
-            <p style="color: #666; font-size: 12px;">
-              If the button doesn't work, copy and paste this link into your browser:<br>
-              ${resetURL}
-            </p>
-          </div>
-        `,
-        };
-
         logger.info("Attempting to resend reset password email", {
           route: "Auth.js",
           endpoint: "/resend-forgot-password",
           email,
         });
-        const info = await transporter.sendMail(mailOptions);
+        const info = await emailService.sendPasswordResetEmail({
+          email,
+          resetUrl: resetURL,
+          isResend: true,
+          context: {
+            route: "Auth.js",
+            endpoint: "/resend-forgot-password",
+          },
+        });
         logger.info("Resend email sent successfully", {
           route: "Auth.js",
           endpoint: "/resend-forgot-password",

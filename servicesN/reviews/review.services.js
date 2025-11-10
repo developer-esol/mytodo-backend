@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const reviewRepository = require("../../repository/review/review.repository");
 const logger = require("../../config/logger");
+const emailService = require("../../shared/services/email.service");
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -415,19 +416,10 @@ const requestReview = async (userId, method, recipient, message) => {
     `Hi! ${user.firstName} ${user.lastName} would appreciate your feedback. Please leave a review here: ${reviewLink}`;
 
   if (method === "email") {
-    const nodemailer = require("nodemailer");
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
+    await emailService.sendReviewRequestEmail({
       to: recipient,
       subject: `Review Request from ${user.firstName} ${user.lastName}`,
+      text: fullMessage,
       html: `
         <h2>Review Request</h2>
         <p>${fullMessage.replace(
@@ -435,6 +427,11 @@ const requestReview = async (userId, method, recipient, message) => {
           `<a href="${reviewLink}">${reviewLink}</a>`
         )}</p>
       `,
+      context: {
+        service: "review.services",
+        function: "requestReview",
+        userId,
+      },
     });
   } else if (method === "sms") {
     const twilio = require("twilio");

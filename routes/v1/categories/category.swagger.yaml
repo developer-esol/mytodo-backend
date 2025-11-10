@@ -7,7 +7,7 @@ paths:
     get:
       tags: [Categories]
       summary: Get all active categories
-      description: Retrieves a list of all active categories, sorted by order and name. This is a public route.
+      description: Retrieves a list of all active categories, sorted by order and name. This is a public route. For admin management (create, update, delete), use the `/admin/categories` endpoints.
       responses:
         "200":
           description: A list of categories returned successfully.
@@ -23,36 +23,6 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/Category"
-        "500":
-          $ref: "#/components/responses/ServerError"
-
-    post:
-      tags: [Categories]
-      summary: Create a new category (Protected)
-      description: Creates a new category. Requires an authenticated Admin user.
-      security:
-        - bearerAuth: [] # ← CHANGED from BearerAuth
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CategoryCreateRequest"
-      responses:
-        "201":
-          description: Category created successfully.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  data:
-                    $ref: "#/components/schemas/Category"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
         "500":
           $ref: "#/components/responses/ServerError"
 
@@ -89,80 +59,6 @@ paths:
                     example: In-person
         "400":
           $ref: "#/components/responses/BadRequestError"
-        "500":
-          $ref: "#/components/responses/ServerError"
-
-  /categories/{id}:
-    put:
-      tags: [Categories]
-      summary: Update an existing category by ID (Protected)
-      description: Updates an existing category by its MongoDB ID. Requires an authenticated Admin user.
-      security:
-        - bearerAuth: [] # ← CHANGED from BearerAuth
-      parameters:
-        - in: path
-          name: id
-          schema:
-            type: string
-          required: true
-          description: The MongoDB ID of the category to update.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CategoryUpdateRequest"
-      responses:
-        "200":
-          description: Category updated successfully.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  data:
-                    $ref: "#/components/schemas/Category"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "404":
-          $ref: "#/components/responses/NotFoundError"
-        "500":
-          $ref: "#/components/responses/ServerError"
-
-    delete:
-      tags: [Categories]
-      summary: Delete a category by ID (Protected)
-      description: Deletes a category by its MongoDB ID. Requires an authenticated Admin user.
-      security:
-        - bearerAuth: [] # ← CHANGED from BearerAuth
-      parameters:
-        - in: path
-          name: id
-          schema:
-            type: string
-          required: true
-          description: The MongoDB ID of the category to delete.
-      responses:
-        "200":
-          description: Category deleted successfully.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  message:
-                    type: string
-                    example: "Category deleted successfully"
-        "401":
-          $ref: "#/components/responses/UnauthorizedError"
-        "404":
-          $ref: "#/components/responses/NotFoundError"
         "500":
           $ref: "#/components/responses/ServerError"
 

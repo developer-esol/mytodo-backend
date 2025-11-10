@@ -1,13 +1,13 @@
 //Two Factor Auth
 const express = require("express");
 const bcrypt = require("bcryptjs");
-const nodemailer = require("nodemailer");
 const User = require("../../../models/user/User");
 const PendingUser = require("../../../models/user/PendingUser");
 const jwt = require("jsonwebtoken");
 const twilio = require("twilio");
 const twofactorAuthValidator = require("../../../validators/v1/auth/twofactorAuth.validator");
 const logger = require("../../../config/logger");
+const emailService = require("../../../shared/services/email.service");
 
 const router = express.Router();
 require("dotenv").config(); // if using .env
@@ -17,15 +17,6 @@ logger.info("Twilio configuration check", {
   hasSID: !!process.env.TWILIO_ACCOUNT_SID,
   hasToken: !!process.env.TWILIO_AUTH_TOKEN,
   hasVerifySID: !!process.env.VERIFY_SERVICE_SID,
-});
-
-// Email Transporter Configuration
-const transporter = nodemailer.createTransport({
-  service: "Gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
 });
 
 // Twilio Client Configuration
@@ -83,11 +74,13 @@ const cleanupConflictingRegistrations = async (email, phone) => {
 const sendOTP = async (email, phone, otp) => {
   try {
     // Send Email
-    await transporter.sendMail({
-      to: email,
-      subject: "Your Verification OTP",
-      text: `Your OTP is ${otp}. It expires in 10 minutes.`,
-      html: `<p>Your OTP is <strong>${otp}</strong>. It expires in 10 minutes.</p>`,
+    await emailService.sendOtpEmail({
+      email,
+      otp,
+      context: {
+        route: "TwoFactorAuth.js",
+        function: "sendOTP",
+      },
     });
     logger.info("OTP sent to email", {
       route: "TwoFactorAuth.js",
@@ -546,11 +539,13 @@ router.post(
       await pendingUser.save();
 
       // Send OTP via email only
-      await transporter.sendMail({
-        to: email,
-        subject: "Your Verification OTP",
-        text: `Your OTP is ${otp}. It expires in 10 minutes.`,
-        html: `<p>Your OTP is <strong>${otp}</strong>. It expires in 10 minutes.</p>`,
+      await emailService.sendOtpEmail({
+        email,
+        otp,
+        context: {
+          route: "TwoFactorAuth.js",
+          endpoint: "/send-email",
+        },
       });
 
       logger.info("OTP sent to email", {

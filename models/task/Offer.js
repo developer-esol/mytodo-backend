@@ -25,7 +25,7 @@ const offerSchema = new mongoose.Schema({
     currency: {
       type: String,
       required: true,
-      default: "USD",
+      default: "AUD",
     },
     message: {
       type: String,

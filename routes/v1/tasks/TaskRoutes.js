@@ -20,7 +20,7 @@ const createTaskHandler = [
 ];
 
 // Add search route before other routes
-router.get("/search", myTaskController.searchTasks);
+router.get("/search", ...validators.searchTasks, myTaskController.searchTasks);
 
 // Standard routes under /api/tasks
 router.post("/", createTaskHandler);
@@ -63,6 +63,12 @@ router.get(
   "/:id/offers",
   ...validators.getTaskById,
   myTaskController.getTaskWithOffers
+);
+// Similar offer tasks
+router.get(
+  "/:id/offers/similar",
+  ...validators.getSimilarOfferTasks,
+  myTaskController.getSimilarOfferTasks
 );
 router.post(
   "/:id/offers",
