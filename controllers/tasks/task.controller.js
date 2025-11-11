@@ -775,12 +775,30 @@ exports.deleteTask = async (req, res) => {
 
 exports.createTaskOffer = async (req, res) => {
   try {
-    logger.debug("Incoming offer creation request");
+    logger.info("📥 Incoming offer creation request", {
+      controller: "task.controller",
+      function: "createTaskOffer",
+      userId: req.user?._id,
+      taskId: req.params.id,
+      body: req.body,
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
 
     const { offerAmount, amount, currency, message, estimatedDuration } =
       req.body;
     const taskId = req.params.id;
     const taskTakerId = req.user._id;
+
+    logger.debug("Request parameters extracted", {
+      controller: "task.controller",
+      taskId,
+      taskTakerId: taskTakerId.toString(),
+      offerAmount,
+      amount,
+      currency,
+      messageLength: message?.length || 0
+    });
 
     const selectedAmount =
       offerAmount !== undefined && offerAmount !== null && offerAmount !== ""
@@ -792,6 +810,13 @@ exports.createTaskOffer = async (req, res) => {
       selectedAmount === null ||
       selectedAmount === ""
     ) {
+      logger.warn("❌ Offer creation failed: Amount missing", {
+        controller: "task.controller",
+        taskId,
+        userId: taskTakerId,
+        offerAmount,
+        amount
+      });
       return res.status(400).json({
         success: false,
         error: "Valid amount is required",
@@ -801,6 +826,13 @@ exports.createTaskOffer = async (req, res) => {
     const numericAmount = Number(selectedAmount);
 
     if (Number.isNaN(numericAmount)) {
+      logger.warn("❌ Offer creation failed: Invalid amount format", {
+        controller: "task.controller",
+        taskId,
+        userId: taskTakerId,
+        selectedAmount,
+        type: typeof selectedAmount
+      });
       return res.status(400).json({
         success: false,
         error: "Valid amount is required",
@@ -808,22 +840,52 @@ exports.createTaskOffer = async (req, res) => {
     }
 
     if (numericAmount <= 0) {
+      logger.warn("❌ Offer creation failed: Negative amount", {
+        controller: "task.controller",
+        taskId,
+        userId: taskTakerId,
+        numericAmount
+      });
       return res.status(400).json({
         success: false,
         error: "Amount must be positive",
       });
     }
 
+    logger.debug("Fetching task from database", {
+      controller: "task.controller",
+      taskId
+    });
+
     const task = await Task.findOne({ _id: taskId, isActive: 1 });
     if (!task) {
+      logger.warn("❌ Offer creation failed: Task not found", {
+        controller: "task.controller",
+        taskId,
+        userId: taskTakerId
+      });
       return res.status(404).json({
         success: false,
         error: "Task not found",
       });
     }
 
+    logger.debug("Task found, validating permissions", {
+      controller: "task.controller",
+      taskId,
+      taskCreatorId: task.createdBy.toString(),
+      taskTakerId: taskTakerId.toString(),
+      taskStatus: task.status
+    });
+
     // Check if user is trying to make an offer on their own task
     if (task.createdBy.toString() === taskTakerId.toString()) {
+      logger.warn("❌ Offer creation failed: User trying to offer on own task", {
+        controller: "task.controller",
+        taskId,
+        userId: taskTakerId,
+        taskCreatorId: task.createdBy.toString()
+      });
       return res.status(403).json({
         success: false,
         error: "You cannot make an offer on your own task",
@@ -831,11 +893,23 @@ exports.createTaskOffer = async (req, res) => {
     }
 
     if (task.status !== "open") {
+      logger.warn("❌ Offer creation failed: Task not accepting offers", {
+        controller: "task.controller",
+        taskId,
+        userId: taskTakerId,
+        taskStatus: task.status
+      });
       return res.status(400).json({
         success: false,
         error: "Task is no longer accepting offers",
       });
     }
+
+    logger.debug("Checking for existing offers", {
+      controller: "task.controller",
+      taskId,
+      taskTakerId: taskTakerId.toString()
+    });
 
     // Check if user has already made an offer on this task
     const existingOffer = await Offer.findOne({
@@ -845,15 +919,41 @@ exports.createTaskOffer = async (req, res) => {
     });
 
     if (existingOffer) {
+      logger.warn("❌ Offer creation failed: Duplicate offer", {
+        controller: "task.controller",
+        taskId,
+        userId: taskTakerId,
+        existingOfferId: existingOffer._id,
+        existingOfferStatus: existingOffer.status
+      });
       return res.status(400).json({
         success: false,
         error: "You have already made an offer on this task",
       });
     }
 
-    logger.debug("Creating offer for task");
+    logger.info("✅ All validations passed, creating offer", {
+      controller: "task.controller",
+      taskId,
+      taskTakerId: taskTakerId.toString(),
+      amount: numericAmount,
+      currency: currency || task.currency || "LKR"
+    });
 
     const offerCurrency = currency || task.currency || "LKR";
+
+    logger.debug("Creating offer document", {
+      controller: "task.controller",
+      offerData: {
+        taskId,
+        taskCreatorId: task.createdBy.toString(),
+        taskTakerId: taskTakerId.toString(),
+        amount: numericAmount,
+        currency: offerCurrency,
+        hasMessage: !!message,
+        hasEstimatedDuration: !!estimatedDuration
+      }
+    });
 
     const newOffer = new Offer({
       taskId: taskId,
@@ -868,12 +968,42 @@ exports.createTaskOffer = async (req, res) => {
       status: "pending",
     });
 
+    logger.debug("Saving offer to database", {
+      controller: "task.controller",
+      offerId: newOffer._id
+    });
+
     await newOffer.save();
 
+    logger.info("✅ Offer saved successfully", {
+      controller: "task.controller",
+      offerId: newOffer._id,
+      taskId,
+      taskTakerId: taskTakerId.toString()
+    });
+
     if (task.offers) {
+      logger.debug("Adding offer to task.offers array", {
+        controller: "task.controller",
+        taskId,
+        offerId: newOffer._id,
+        currentOffersCount: task.offers.length
+      });
       task.offers.push(newOffer._id);
       await task.save();
+      logger.debug("Task updated with new offer", {
+        controller: "task.controller",
+        taskId,
+        totalOffers: task.offers.length
+      });
     }
+
+    logger.debug("Creating chat for offer", {
+      controller: "task.controller",
+      taskId,
+      posterId: task.createdBy.toString(),
+      taskerId: taskTakerId.toString()
+    });
 
     const newChat = new Chat({
       taskId: taskId,
@@ -885,44 +1015,88 @@ exports.createTaskOffer = async (req, res) => {
 
     await newChat.save();
 
+    logger.debug("Chat created successfully", {
+      controller: "task.controller",
+      chatId: newChat._id,
+      taskId
+    });
+
+    logger.debug("Populating offer with user details", {
+      controller: "task.controller",
+      offerId: newOffer._id
+    });
+
     const populatedOffer = await Offer.findById(newOffer._id)
       .populate("taskTakerId", "firstName lastName avatar rating")
       .populate("taskCreatorId", "firstName lastName")
       .lean();
 
+    logger.debug("Offer populated successfully", {
+      controller: "task.controller",
+      offerId: newOffer._id,
+      taskTakerName: `${populatedOffer.taskTakerId?.firstName} ${populatedOffer.taskTakerId?.lastName}`,
+      taskCreatorName: `${populatedOffer.taskCreatorId?.firstName} ${populatedOffer.taskCreatorId?.lastName}`
+    });
+
     try {
+      logger.debug("Sending offer notification", {
+        controller: "task.controller",
+        offerId: newOffer._id,
+        taskId,
+        toUserId: task.createdBy.toString()
+      });
+
       await notificationService.notifyOfferMade(
         populatedOffer,
         task,
         populatedOffer.taskTakerId,
         populatedOffer.taskCreatorId
       );
-      logger.info("Offer notification sent successfully", {
+
+      logger.info("✅ Offer notification sent successfully", {
         controller: "task.controller",
         taskId,
-        providerId: req.user._id,
+        offerId: newOffer._id,
+        providerId: req.user._id
       });
     } catch (notificationError) {
-      logger.warn("Error sending offer notification", {
+      logger.warn("⚠️ Error sending offer notification", {
         controller: "task.controller",
         error: notificationError.message,
+        stack: notificationError.stack,
         taskId,
+        offerId: newOffer._id
       });
     }
 
-    logger.info("Offer created successfully", {
+    logger.info("🎉 Offer created successfully - Complete", {
       controller: "task.controller",
       offerId: populatedOffer._id,
+      taskId,
+      taskTakerId: taskTakerId.toString(),
+      amount: numericAmount,
+      currency: offerCurrency,
+      timestamp: new Date().toISOString()
     });
+
     res.status(201).json({
       success: true,
       data: populatedOffer,
     });
   } catch (err) {
-    logger.error("Error in createTaskOffer");
+    logger.error("❌ FATAL ERROR in createTaskOffer", {
+      controller: "task.controller",
+      function: "createTaskOffer",
+      error: err.message,
+      stack: err.stack,
+      taskId: req.params.id,
+      userId: req.user?._id,
+      body: req.body,
+      timestamp: new Date().toISOString()
+    });
     res.status(500).json({
       success: false,
-      error: "Server Error JNI: " + err.message,
+      error: "Server Error: " + err.message,
     });
   }
 };
@@ -1674,8 +1848,25 @@ exports.cancelTask = async (req, res) => {
 
 exports.acceptOffer = async (req, res) => {
   try {
+    logger.info("📥 Incoming accept offer request", {
+      controller: "task.controller",
+      function: "acceptOffer",
+      taskId: req.params.taskId,
+      offerId: req.params.offerId,
+      userId: req.user._id,
+      ip: req.ip,
+      timestamp: new Date().toISOString()
+    });
+
     const { taskId, offerId } = req.params;
     const userId = req.user._id;
+
+    logger.debug("Calling acceptOfferService", {
+      controller: "task.controller",
+      taskId,
+      offerId,
+      userId: userId.toString()
+    });
 
     const result = await taskService.acceptOfferService(
       taskId,
@@ -1683,13 +1874,32 @@ exports.acceptOffer = async (req, res) => {
       userId
     );
 
+    logger.info("✅ Offer accepted successfully", {
+      controller: "task.controller",
+      function: "acceptOffer",
+      taskId,
+      offerId,
+      userId: userId.toString(),
+      transactionId: result.transaction?._id,
+      timestamp: new Date().toISOString()
+    });
+
     return res.status(200).json({
       success: true,
       data: result,
       message: "Offer accepted successfully",
     });
   } catch (error) {
-    logger.error("Error accepting offer:");
+    logger.error("❌ Error accepting offer", {
+      controller: "task.controller",
+      function: "acceptOffer",
+      error: error.message,
+      stack: error.stack,
+      taskId: req.params.taskId,
+      offerId: req.params.offerId,
+      userId: req.user?._id,
+      timestamp: new Date().toISOString()
+    });
 
     let statusCode = 500;
     if (
@@ -1716,16 +1926,45 @@ exports.acceptOffer = async (req, res) => {
 
 exports.getTaskWithOffers = async (req, res) => {
   try {
+    logger.info("📥 Request to get task with offers", {
+      controller: "task.controller",
+      function: "getTaskWithOffers",
+      taskId: req.params.id,
+      userId: req.user?._id,
+      ip: req.ip,
+      timestamp: new Date().toISOString()
+    });
+
     const taskId = req.params.id;
 
+    logger.debug("Fetching task with offers", {
+      controller: "task.controller",
+      taskId
+    });
+
     const taskWithOffers = await taskService.getTaskWithOffersService(taskId);
+
+    logger.info("✅ Task with offers retrieved successfully", {
+      controller: "task.controller",
+      taskId,
+      offersCount: taskWithOffers.offersCount,
+      taskStatus: taskWithOffers.status,
+      timestamp: new Date().toISOString()
+    });
 
     return res.status(200).json({
       success: true,
       data: taskWithOffers,
     });
   } catch (error) {
-    logger.error("Error fetching task with offers:");
+    logger.error("❌ Error fetching task with offers", {
+      controller: "task.controller",
+      function: "getTaskWithOffers",
+      error: error.message,
+      stack: error.stack,
+      taskId: req.params.id,
+      timestamp: new Date().toISOString()
+    });
 
     let statusCode = 500;
     if (error.message.includes("Invalid")) {
