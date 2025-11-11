@@ -822,10 +822,32 @@ exports.createTaskOffer = async (req, res) => {
       });
     }
 
+    // Check if user is trying to make an offer on their own task
+    if (task.createdBy.toString() === taskTakerId.toString()) {
+      return res.status(403).json({
+        success: false,
+        error: "You cannot make an offer on your own task",
+      });
+    }
+
     if (task.status !== "open") {
       return res.status(400).json({
         success: false,
         error: "Task is no longer accepting offers",
+      });
+    }
+
+    // Check if user has already made an offer on this task
+    const existingOffer = await Offer.findOne({
+      taskId: taskId,
+      taskTakerId: taskTakerId,
+      status: { $in: ["pending", "accepted"] },
+    });
+
+    if (existingOffer) {
+      return res.status(400).json({
+        success: false,
+        error: "You have already made an offer on this task",
       });
     }
 

@@ -170,7 +170,6 @@ const getMyTasksWithOffers = async (userId, options = {}) => {
   if (!isValidObjectId(userId)) {
     throw new Error("Invalid user ID");
   }
-  npm;
 
   const { section, subsection, subSection, status, role } = options;
 
