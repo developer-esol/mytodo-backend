@@ -29,3 +29,8 @@ exports.getByLocation = [
     .withMessage("Invalid type"),
   validateRequest,
 ];
+
+exports.deleteCategory = [
+  param("id").isMongoId().withMessage("Invalid category id"),
+  validateRequest,
+];

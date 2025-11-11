@@ -70,9 +70,23 @@ const deleteCategoryById = async (categoryId) => {
   return deletedCategory;
 };
 
+const updateCategoryById = async (categoryId, updateData) => {
+  const updated = await categoryRepository.findByIdAndUpdate(
+    categoryId,
+    updateData
+  );
+
+  if (!updated) {
+    throw new Error("Category not found");
+  }
+
+  return updated;
+};
+
 module.exports = {
   getAllActiveCategories,
   getCategoriesByLocationType,
   createNewCategory,
   deleteCategoryById,
+  updateCategoryById,
 };

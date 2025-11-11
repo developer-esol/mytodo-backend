@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { adminAuth } = require("../../../../middleware/adminAuthSimple");
+const logger = require("../../../../config/logger");
 
 // Get available roles and statuses for dropdowns
 // Note: This endpoint is intentionally public (no adminAuth middleware)
@@ -28,7 +29,12 @@ router.get("/metadata", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Get metadata error:", error);
+    logger.error("Get metadata error", {
+      service: "admin.metadata.routes",
+      file: "adminMetadataRoutes.js",
+      error: error.message,
+      stack: error.stack,
+    });
     res.status(500).json({
       status: "error",
       message: "Failed to fetch metadata",

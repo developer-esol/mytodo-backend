@@ -5,7 +5,9 @@ const Payment = require("../../models/payment/Payment");
 const User = require("../../models/user/User");
 
 const findTasksByQuery = async (query) => {
-  return await Task.find(query)
+  // Add isActive filter to all queries
+  const activeQuery = { ...query, isActive: 1 };
+  return await Task.find(activeQuery)
     .populate("createdBy", "firstName lastName avatar rating")
     .populate("assignedTo", "firstName lastName avatar rating")
     .sort({ "dateRange.end": 1, createdAt: -1 })
@@ -13,18 +15,18 @@ const findTasksByQuery = async (query) => {
 };
 
 const findTaskById = async (taskId) => {
-  return await Task.findById(taskId);
+  return await Task.findOne({ _id: taskId, isActive: 1 });
 };
 
 const findTaskByIdWithUsers = async (taskId) => {
-  return await Task.findById(taskId).populate(
+  return await Task.findOne({ _id: taskId, isActive: 1 }).populate(
     "createdBy assignedTo",
     "firstName lastName avatar rating completedTasks"
   );
 };
 
 const findTaskByIdWithFullUsers = async (taskId) => {
-  return await Task.findById(taskId)
+  return await Task.findOne({ _id: taskId, isActive: 1 })
     .populate({
       path: "createdBy",
       select:
@@ -40,7 +42,9 @@ const findTaskByIdWithFullUsers = async (taskId) => {
 };
 
 const findOneTask = async (query) => {
-  return await Task.findOne(query).populate(
+  // Add isActive filter
+  const activeQuery = { ...query, isActive: 1 };
+  return await Task.findOne(activeQuery).populate(
     "createdBy assignedTo",
     "firstName lastName avatar rating completedTasks"
   );
@@ -81,6 +85,7 @@ const findOffersByTaskId = async (taskId) => {
   return await Offer.find({
     taskId: taskId,
     status: { $ne: "withdrawn" },
+    isActive: 1,
   })
     .populate({
       path: "taskTakerId",
@@ -92,7 +97,7 @@ const findOffersByTaskId = async (taskId) => {
 };
 
 const findOffersByUserId = async (userId, statusFilter = {}) => {
-  const query = { taskTakerId: userId, ...statusFilter };
+  const query = { taskTakerId: userId, isActive: 1, ...statusFilter };
   return await Offer.find(query)
     .populate("taskId", "title budget dateRange status")
     .populate("taskCreatorId", "firstName lastName avatar rating")
@@ -103,11 +108,12 @@ const findAcceptedOfferByTaskId = async (taskId) => {
   return await Offer.findOne({
     taskId: taskId,
     status: "accepted",
+    isActive: 1,
   });
 };
 
 const findOfferById = async (offerId) => {
-  return await Offer.findById(offerId);
+  return await Offer.findOne({ _id: offerId, isActive: 1 });
 };
 
 const acceptOffer = async (offer) => {
@@ -183,6 +189,32 @@ const incrementUserCompletedTasks = async (userId, votes) => {
   });
 };
 
+const softDeleteTask = async (taskId, userId) => {
+  return await Task.findByIdAndUpdate(
+    taskId,
+    {
+      $set: {
+        isActive: 0,
+        deletedAt: new Date(),
+        deletedBy: userId,
+      },
+    },
+    { new: true }
+  );
+};
+
+const softDeleteOffers = async (taskId) => {
+  return await Offer.updateMany(
+    { taskId: taskId },
+    {
+      $set: {
+        isActive: 0,
+        deletedAt: new Date(),
+      },
+    }
+  );
+};
+
 module.exports = {
   findTasksByQuery,
   findTaskById,
@@ -205,4 +237,6 @@ module.exports = {
   updateTransactionStatus,
   updatePaymentStatus,
   incrementUserCompletedTasks,
+  softDeleteTask,
+  softDeleteOffers,
 };

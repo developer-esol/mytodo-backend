@@ -30,6 +30,10 @@ const getDateRange = (days) => {
 const buildTaskQuery = (section, subsection, userId) => {
   const now = new Date();
   let query = {};
+  // Default to user's tasks when no section provided
+  if (!section) {
+    section = "my-tasks";
+  }
 
   switch (section) {
     case "browse-tasks":
@@ -162,12 +166,112 @@ const formatTaskWithOffers = async (task, userId) => {
   };
 };
 
-const getMyTasksWithOffers = async (userId, section, subsection) => {
+const getMyTasksWithOffers = async (userId, options = {}) => {
   if (!isValidObjectId(userId)) {
     throw new Error("Invalid user ID");
   }
 
-  const query = buildTaskQuery(section, subsection, userId);
+  const { section, subsection, subSection, status, role } = options;
+
+  const normalizeString = (value) =>
+    typeof value === "string" ? value.trim().toLowerCase() : undefined;
+
+  const sectionMap = {
+    "my-tasks": "my-tasks",
+    mytasks: "my-tasks",
+    poster: "my-tasks",
+    "task-im-doing": "task-im-doing",
+    taskimdoing: "task-im-doing",
+    tasker: "task-im-doing",
+    browse: "browse-tasks",
+    "browse-tasks": "browse-tasks",
+    overdue: "overdue-tasks",
+    "overdue-tasks": "overdue-tasks",
+    completed: "completed-tasks",
+    "completed-tasks": "completed-tasks",
+  };
+
+  const subsectionMap = {
+    open: "open",
+    todo: "todo",
+    completed: "completed",
+    pending: "pending",
+    assigned: "assigned",
+    "in-progress": "in-progress",
+    inprogress: "in-progress",
+    overdue: "overdue",
+    expired: "expired",
+    "last-7-days": "last-7-days",
+    last7days: "last-7-days",
+    "last-30-days": "last-30-days",
+    last30days: "last-30-days",
+    "last-90-days": "last-90-days",
+    last90days: "last-90-days",
+  };
+
+  const normalizeSection = (value) => {
+    const normalized = normalizeString(value);
+    if (!normalized) return undefined;
+    return sectionMap[normalized];
+  };
+
+  const normalizeSubsection = (value) => {
+    const normalized = normalizeString(value);
+    if (!normalized) return undefined;
+    return subsectionMap[normalized] || normalized;
+  };
+
+  const normalizeStatus = (value) => {
+    const normalized = normalizeString(value);
+    if (!normalized) return undefined;
+    return subsectionMap[normalized] || normalized;
+  };
+
+  const normalizedSection = normalizeSection(section);
+  const normalizedRole = normalizeString(role);
+  const normalizedStatus = normalizeStatus(status);
+  const normalizedSubsection =
+    normalizeSubsection(subsection) || normalizeSubsection(subSection);
+
+  let effectiveSection = normalizedSection;
+
+  if (!effectiveSection) {
+    effectiveSection =
+      normalizedRole === "tasker" ? "task-im-doing" : "my-tasks";
+  }
+
+  let query;
+
+  if (effectiveSection) {
+    const subsectionForSection = normalizedSubsection || normalizedStatus;
+    query = buildTaskQuery(effectiveSection, subsectionForSection, userId);
+  } else {
+    if (normalizedRole === "poster") {
+      query = { createdBy: userId };
+    } else if (normalizedRole === "tasker") {
+      query = { assignedTo: userId };
+    } else {
+      query = {
+        $or: [{ createdBy: userId }, { assignedTo: userId }],
+      };
+    }
+
+    const fallbackStatus = normalizedStatus || normalizedSubsection;
+    if (fallbackStatus) {
+      query.status = fallbackStatus;
+    }
+  }
+
+  const fixedSectionStatuses = new Set(["overdue-tasks", "completed-tasks"]);
+
+  if (
+    normalizedStatus &&
+    effectiveSection &&
+    !fixedSectionStatuses.has(effectiveSection)
+  ) {
+    query = { ...query, status: normalizedStatus };
+  }
+
   const tasks = await taskRepository.findTasksByQuery(query);
 
   const tasksWithOffers = await Promise.all(
@@ -181,7 +285,6 @@ const updateTaskStatusService = async (taskId, userId, newStatus, reason) => {
   if (!isValidObjectId(taskId)) {
     throw new Error("Invalid task ID");
   }
-
   const task = await taskRepository.findTaskById(taskId);
   if (!task) {
     throw new Error("Task not found");
@@ -625,6 +728,129 @@ const getTaskWithOffersService = async (taskId) => {
   };
 };
 
+/**
+ * Get similar tasks that have offers, based on categories and optional text query.
+ * - Matches any overlapping category with the source task
+ * - Excludes the provided taskId
+ * - Ensures tasks have at least one offer
+ * - Optional q: matches task title or creator name (first/last)
+ * @param {String} taskId
+ * @param {Object} options
+ * @param {String} [options.q]
+ * @param {Number} [options.limit=10]
+ */
+const getSimilarOfferTasksService = async (taskId, { q, limit = 10 } = {}) => {
+  if (!isValidObjectId(taskId)) {
+    throw new Error("Invalid task ID");
+  }
+
+  const source = await taskRepository.findTaskByIdWithFullUsers(taskId);
+  if (!source) throw new Error("Task not found");
+
+  // Normalize categories to array of strings
+  const categories = Array.isArray(source.categories)
+    ? source.categories
+    : typeof source.categories === "string"
+    ? source.categories
+        .split(",")
+        .map((c) => c.trim())
+        .filter(Boolean)
+    : [];
+
+  const matchStage = {
+    _id: { $ne: source._id },
+    status: { $in: ["open", "assigned", "in-progress"] },
+<<<<<<< HEAD
+    isActive: 1,
+=======
+>>>>>>> fb532603d7d06d638ea0091cfda8592e56af62bf
+  };
+  if (categories.length) {
+    matchStage.categories = { $in: categories };
+  }
+
+  const pipeline = [
+    { $match: matchStage },
+    {
+      $lookup: {
+        from: "offers",
+        localField: "_id",
+        foreignField: "taskId",
+        as: "offers",
+      },
+    },
+    {
+      $addFields: { offerCount: { $size: "$offers" } },
+    },
+    { $match: { offerCount: { $gt: 0 } } },
+    {
+      $lookup: {
+        from: "users",
+        localField: "createdBy",
+        foreignField: "_id",
+        as: "creator",
+      },
+    },
+    { $addFields: { creator: { $arrayElemAt: ["$creator", 0] } } },
+  ];
+
+  if (q && typeof q === "string" && q.trim()) {
+    const term = q.trim();
+    pipeline.push({
+      $match: {
+        $or: [
+          { title: { $regex: term, $options: "i" } },
+          { "creator.firstName": { $regex: term, $options: "i" } },
+          { "creator.lastName": { $regex: term, $options: "i" } },
+        ],
+      },
+    });
+  } else if (source.title) {
+    // If no explicit query, derive keywords from source title (basic split)
+    const words = String(source.title)
+      .split(/\s+/)
+      .map((w) => w.replace(/[^\p{L}\p{N}]/gu, ""))
+      .filter((w) => w.length >= 3)
+      .slice(0, 5);
+
+    if (words.length) {
+      pipeline.push({
+        $match: {
+          $or: words.map((w) => ({ title: { $regex: w, $options: "i" } })),
+        },
+      });
+    }
+  }
+
+  pipeline.push(
+    { $sort: { offerCount: -1, createdAt: -1 } },
+    { $limit: Math.min(Number(limit) || 10, 50) },
+    {
+      $project: {
+        _id: 1,
+        title: 1,
+        categories: 1,
+        budget: 1,
+        currency: 1,
+        status: 1,
+        images: 1,
+        createdAt: 1,
+        offerCount: 1,
+        createdBy: {
+          _id: "$creator._id",
+          firstName: "$creator.firstName",
+          lastName: "$creator.lastName",
+          avatar: "$creator.avatar",
+        },
+      },
+    }
+  );
+
+  const Task = require("../../models/task/Task");
+  const results = await Task.aggregate(pipeline);
+  return results;
+};
+
 module.exports = {
   getMyTasksWithOffers,
   updateTaskStatusService,
@@ -634,4 +860,5 @@ module.exports = {
   cancelTaskService,
   acceptOfferService,
   getTaskWithOffersService,
+  getSimilarOfferTasksService,
 };

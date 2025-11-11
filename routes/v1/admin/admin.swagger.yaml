@@ -350,6 +350,106 @@ paths:
                         items:
                           $ref: "#/components/schemas/TimeSeriesData"
 
+  /admin/categories:
+    post:
+      tags:
+        - Category Management
+      summary: Create a new category
+      description: Create a category for the marketplace. Requires admin privileges.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryCreateRequest"
+      responses:
+        201:
+          description: Category created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Category"
+
+  /admin/categories/{id}:
+    put:
+      tags:
+        - Category Management
+      summary: Update an existing category
+      description: Update category properties such as name, description, icon, or order.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Category ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryUpdateRequest"
+      responses:
+        200:
+          description: Category updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Category"
+        404:
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      tags:
+        - Category Management
+      summary: Delete a category
+      description: Remove a category by its ID. Use with caution as this action cannot be undone.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-fA-F]{24}$"
+          description: Category ID
+      responses:
+        200:
+          description: Category deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Category deleted successfully
+        404:
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /admin/commission-settings:
     get:
       tags:
@@ -410,6 +510,95 @@ paths:
                     type: string
                   data:
                     $ref: "#/components/schemas/CommissionSettings"
+
+  /admin/smtp-settings:
+    get:
+      tags:
+        - SMTP Settings
+      summary: Get SMTP configuration
+      description: Retrieve stored SMTP credentials and the effective runtime configuration
+      responses:
+        200:
+          description: SMTP settings retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: object
+                    properties:
+                      stored:
+                        $ref: "#/components/schemas/SmtpStoredConfig"
+                      effective:
+                        $ref: "#/components/schemas/SmtpEffectiveConfig"
+                      source:
+                        type: string
+                        description: Primary source of the active SMTP configuration
+                        example: database
+
+    put:
+      tags:
+        - SMTP Settings
+      summary: Update SMTP configuration
+      description: Store SMTP credentials in the database for use by the email service
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SmtpUpdateRequest"
+      responses:
+        200:
+          description: SMTP settings updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      stored:
+                        $ref: "#/components/schemas/SmtpStoredConfig"
+                      effective:
+                        $ref: "#/components/schemas/SmtpEffectiveConfig"
+
+  /admin/smtp-settings/test:
+    post:
+      tags:
+        - SMTP Settings
+      summary: Test SMTP configuration
+      description: Verify the SMTP connection, optionally sending a test email
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SmtpTestRequest"
+      responses:
+        200:
+          description: SMTP configuration verified
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/SmtpTestResult"
 
   /admin/metadata:
     get:
@@ -674,6 +863,134 @@ components:
               type: integer
         count:
           type: integer
+
+    SmtpStoredConfig:
+      type: object
+      nullable: true
+      properties:
+        host:
+          type: string
+          nullable: true
+        port:
+          type: integer
+          nullable: true
+        service:
+          type: string
+          nullable: true
+        secure:
+          type: boolean
+          nullable: true
+        requireTLS:
+          type: boolean
+          nullable: true
+        user:
+          type: string
+          nullable: true
+        from:
+          type: string
+          nullable: true
+        debug:
+          type: boolean
+          nullable: true
+        logger:
+          type: boolean
+          nullable: true
+        hasPassword:
+          type: boolean
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedBy:
+          type: string
+          nullable: true
+        updatedByEmail:
+          type: string
+          nullable: true
+
+    SmtpEffectiveConfig:
+      type: object
+      properties:
+        host:
+          type: string
+          nullable: true
+        port:
+          type: integer
+          nullable: true
+        service:
+          type: string
+          nullable: true
+        secure:
+          type: boolean
+        requireTLS:
+          type: boolean
+        user:
+          type: string
+          nullable: true
+        from:
+          type: string
+          nullable: true
+        debug:
+          type: boolean
+        logger:
+          type: boolean
+        hasPassword:
+          type: boolean
+        passwordMasked:
+          type: string
+          nullable: true
+
+    SmtpUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        host:
+          type: string
+        port:
+          type: integer
+        service:
+          type: string
+        secure:
+          type: boolean
+        requireTLS:
+          type: boolean
+        user:
+          type: string
+        pass:
+          type: string
+          description: Plain text SMTP password. Omit to retain the existing value.
+        from:
+          type: string
+        debug:
+          type: boolean
+        logger:
+          type: boolean
+
+    SmtpTestRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        to:
+          type: string
+          format: email
+          description: Optional email address to receive a test message
+        subject:
+          type: string
+        text:
+          type: string
+        html:
+          type: string
+        config:
+          $ref: "#/components/schemas/SmtpUpdateRequest"
+
+    SmtpTestResult:
+      type: object
+      properties:
+        verified:
+          type: boolean
+        messageId:
+          type: string
+          nullable: true
 
     Error:
       type: object

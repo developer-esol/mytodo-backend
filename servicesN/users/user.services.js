@@ -1,10 +1,12 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const nodemailer = require("nodemailer");
 const { auth } = require("../../config/firebase-admin");
 const { validateDateOfBirth } = require("../../utils/ageValidation");
 const userRepository = require("../../repository/user/user.repository");
 const logger = require("../../config/logger");
+const emailService = require("../../shared/services/email.service");
+// S3 upload helper (no base64 persistence)
+const { uploadBuffer } = require("../../utils/imageUpload");
 
 /**
  * User Service - Business Logic Layer
@@ -12,15 +14,6 @@ const logger = require("../../config/logger");
  */
 class UserService {
   constructor() {
-    // Email Transporter Configuration
-    this.transporter = nodemailer.createTransport({
-      service: "Gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
     this.validCountries = ["AU", "NZ", "LK"];
   }
 
@@ -42,11 +35,13 @@ class UserService {
     });
 
     try {
-      await this.transporter.sendMail({
-        to: email,
-        subject: "Your OTP Code",
-        text: `Your OTP is ${otp}. It expires in 10 minutes.`,
-        html: `<p>Your OTP is <strong>${otp}</strong>. It expires in 10 minutes.</p>`,
+      await emailService.sendOtpEmail({
+        email,
+        otp,
+        context: {
+          service: "user.services",
+          function: "sendOTPEmail",
+        },
       });
 
       logger.info("OTP email sent successfully", {
@@ -712,28 +707,39 @@ class UserService {
       let avatarUrl;
 
       if (file) {
-        // Check file size to prevent extremely large base64 strings
-        if (file.size > 1024 * 1024) {
+        // Enforce size limit (5MB) before uploading to S3
+        const MAX_SIZE = 5 * 1024 * 1024;
+        if (file.size > MAX_SIZE) {
           logger.warn("Avatar file too large", {
             service: "user.services",
             function: "uploadAvatar",
             userId,
             fileSize: file.size,
+            maxAllowed: MAX_SIZE,
           });
           throw new Error(
-            "File too large. Please choose an image smaller than 1MB."
+            "File too large. Please choose an image smaller than 5MB."
           );
         }
 
-        // Create a data URL from the uploaded file
-        const base64Image = file.buffer.toString("base64");
-        avatarUrl = `data:${file.mimetype};base64,${base64Image}`;
-        logger.debug("Avatar converted to base64", {
-          service: "user.services",
-          function: "uploadAvatar",
-          userId,
-          mimeType: file.mimetype,
-        });
+        try {
+          avatarUrl = await uploadBuffer(file.buffer, file.mimetype, "avatars");
+          logger.debug("Avatar uploaded to S3", {
+            service: "user.services",
+            function: "uploadAvatar",
+            userId,
+            mimeType: file.mimetype,
+            s3Url: avatarUrl,
+          });
+        } catch (uploadErr) {
+          logger.error("Failed uploading avatar to S3", {
+            service: "user.services",
+            function: "uploadAvatar",
+            userId,
+            error: uploadErr.message,
+          });
+          throw new Error("Failed to upload avatar");
+        }
       } else {
         // Generate a unique avatar URL if no file uploaded
         const colors = [

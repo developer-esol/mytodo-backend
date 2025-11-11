@@ -10,6 +10,7 @@ const {
   logUploadedFiles,
 } = require("../../../middleware/uploadQA");
 const validators = require("../../../validators/v1/tasks/tasks.validator");
+const logger = require("../../../config/logger");
 
 // Route handlers
 const createTaskHandler = [
@@ -20,7 +21,10 @@ const createTaskHandler = [
 ];
 
 // Add search route before other routes
-router.get("/search", myTaskController.searchTasks);
+router.get("/search", ...validators.searchTasks, myTaskController.searchTasks);
+
+// Add filter route before other routes
+router.get("/filter", ...validators.filterTasks, myTaskController.filterTasks);
 
 // Standard routes under /api/tasks
 router.post("/", createTaskHandler);
@@ -63,6 +67,12 @@ router.get(
   "/:id/offers",
   ...validators.getTaskById,
   myTaskController.getTaskWithOffers
+);
+// Similar offer tasks
+router.get(
+  "/:id/offers/similar",
+  ...validators.getSimilarOfferTasks,
+  myTaskController.getSimilarOfferTasks
 );
 router.post(
   "/:id/offers",
@@ -169,10 +179,11 @@ router
       }
 
       // Find tasks where user is creator or assigned
-      const tasks = await require("../models/TaskDelete")
-        .find({
-          $or: [{ createdBy: userId }, { assignedTo: userId }],
-        })
+      const Task = require("../../../models/task/Task");
+      const tasks = await Task.find({
+        $or: [{ createdBy: userId }, { assignedTo: userId }],
+        isActive: 1,
+      })
         .populate("createdBy", "firstName lastName avatar")
         .populate("assignedTo", "firstName lastName avatar")
         .sort({ createdAt: -1 })
@@ -212,7 +223,12 @@ router
         data: formattedTasks,
       });
     } catch (error) {
-      console.error("Error fetching user tasks:", error);
+      logger.error("Error fetching user tasks", {
+        route: "GET /tasks/user/:userId",
+        userId: req.params.userId,
+        error: error.message,
+        stack: error.stack,
+      });
       res.status(500).json({
         success: false,
         message: "Server error while fetching user tasks",

@@ -126,3 +126,33 @@ exports.deleteCategory = async (req, res) => {
     });
   }
 };
+
+exports.updateCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const updated = await categoryService.updateCategoryById(id, updateData);
+
+    logger.info("Category updated successfully", {
+      controller: "categories.controller",
+      categoryId: id,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: updated,
+    });
+  } catch (error) {
+    logger.error("Error updating category:", {
+      controller: "categories.controller",
+      error: error.message,
+      stack: error.stack,
+    });
+    const statusCode = error.message === "Category not found" ? 404 : 500;
+    return res.status(statusCode).json({
+      success: false,
+      message: error.message || "Error updating category",
+    });
+  }
+};

@@ -73,6 +73,21 @@ const TaskSchema = new mongoose.Schema(
       ],
       default: "open",
     },
+    isActive: {
+      type: Number,
+      default: 1,
+      enum: [0, 1],
+      index: true,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -131,4 +146,3 @@ TaskSchema.post("save", async function (doc) {
 });
 
 module.exports = mongoose.model("Task", TaskSchema);
-//Chamith

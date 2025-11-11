@@ -25,11 +25,16 @@ const offerSchema = new mongoose.Schema({
     currency: {
       type: String,
       required: true,
-      default: "USD",
+      default: "AUD",
     },
     message: {
       type: String,
       required: false,
+    },
+    estimatedDuration: {
+      type: String,
+      required: false,
+      trim: true,
     },
   },
   // questions: [
@@ -49,6 +54,16 @@ const offerSchema = new mongoose.Schema({
     type: String,
     enum: ["pending", "accepted", "rejected", "countered", "withdrawn"],
     default: "pending",
+  },
+  isActive: {
+    type: Number,
+    default: 1,
+    enum: [0, 1],
+    index: true,
+  },
+  deletedAt: {
+    type: Date,
+    default: null,
   },
   createdAt: {
     type: Date,

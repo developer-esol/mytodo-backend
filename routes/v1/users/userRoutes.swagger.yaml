@@ -397,7 +397,7 @@ paths:
       tags:
         - Profile
       summary: Upload user avatar
-      description: Upload a profile picture for the authenticated user. Accepts image files up to 1MB. Creates base64 data URL or generates avatar if no file provided.
+      description: Upload a profile picture for the authenticated user. The image is uploaded to S3 and only the URL is stored in the database. If no file is provided, a generated avatar URL is used.
       security:
         - bearerAuth: []
       requestBody:
@@ -410,7 +410,7 @@ paths:
                 avatar:
                   type: string
                   format: binary
-                  description: Avatar image file (optional, max 1MB)
+                  description: Avatar image file (optional, max 5MB)
       responses:
         200:
           description: Avatar uploaded successfully
@@ -427,7 +427,7 @@ paths:
                     properties:
                       avatar:
                         type: string
-                        description: Avatar URL (data URL or generated avatar)
+                        description: S3 Avatar URL (or generated avatar URL)
                       user:
                         $ref: "#/components/schemas/UserProfileDetailed"
                   message:
@@ -445,7 +445,7 @@ paths:
                     example: false
                   message:
                     type: string
-                    example: File too large. Please choose an image smaller than 1MB.
+                    example: File too large. Please choose an image smaller than 5MB.
         404:
           description: User not found
           content:

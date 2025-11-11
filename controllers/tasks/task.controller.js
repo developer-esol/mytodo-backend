@@ -1,12 +1,19 @@
-const taskService = require("../../servicesN/tasks/tasks.services");
+const mongoose = require("mongoose");
 const Task = require("../../models/task/Task");
 const Offer = require("../../models/task/Offer");
 const User = require("../../models/user/User");
 const Question = require("../../models/task/Question");
 const Chat = require("../../models/chat/Chat");
-const notificationService = require("../../shared/services/notificationService");
-const mongoose = require("mongoose");
 const logger = require("../../config/logger");
+// Image upload helpers (S3)
+const { uploadBase64Array } = require("../../utils/imageUpload");
+const taskServices = require("../../servicesN/tasks/tasks.services");
+
+const taskService = require("../../servicesN/tasks/tasks.services");
+const taskRepository = require("../../repository/task/task.repository");
+const notificationService = require("../../shared/services/notificationService");
+// Image upload helpers (S3)
+const { uploadBase64Array } = require("../../utils/imageUpload");
 
 exports.createTask = async (req, res) => {
   try {
@@ -84,7 +91,7 @@ exports.createTask = async (req, res) => {
 
     if (isMobileApp && isMovingTask) {
       logger.debug("Validating moving task fields:", {
-      controller: "task.controller",
+        controller: "task.controller",
         pickupLocation,
         pickupPostalCode,
         dropoffLocation,
@@ -106,11 +113,30 @@ exports.createTask = async (req, res) => {
       });
     }
 
-    const coordinates = req.body.coordinates
-      ? typeof req.body.coordinates === "string"
-        ? JSON.parse(req.body.coordinates)
-        : req.body.coordinates
-      : undefined;
+    // Safe parse helper
+    const safeParse = (val) => {
+      if (typeof val !== "string") return val;
+      const trimmed = val.trim();
+      // Only attempt JSON.parse if it looks like JSON
+      if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) return val;
+      try {
+        return JSON.parse(trimmed);
+      } catch (e) {
+        logger.warn("safeParse JSON failed", {
+          controller: "task.controller",
+          fieldSample: trimmed.substring(0, 50),
+          error: e.message,
+        });
+        return val; // Return original string; caller can handle differently
+      }
+    };
+
+    const coordinatesRaw = req.body.coordinates;
+    const coordinatesParsed = safeParse(coordinatesRaw);
+    const coordinates =
+      coordinatesParsed && typeof coordinatesParsed === "object"
+        ? coordinatesParsed
+        : undefined;
 
     let startDate, endDate;
 
@@ -168,6 +194,78 @@ exports.createTask = async (req, res) => {
       };
     }
 
+    // Build image URL array (prefer multipart; fallback to base64 -> S3)
+    let imageUrls = [];
+    if (req.files?.length) {
+      imageUrls = req.files.map((f) => f.location);
+      logger.debug("Using multipart uploaded images", {
+        controller: "task.controller",
+        count: imageUrls.length,
+      });
+    } else if (req.body.images) {
+      let rawImages = req.body.images;
+      if (typeof rawImages === "string") {
+        const trimmed = rawImages.trim();
+        // If it's a pure base64 data URL, wrap as array directly
+        if (/^data:image\/[a-zA-Z0-9+.-]+;base64,/.test(trimmed)) {
+          rawImages = [trimmed];
+        } else if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+          // Attempt JSON parse only if it appears to be JSON
+          const parsed = safeParse(trimmed);
+          rawImages = Array.isArray(parsed)
+            ? parsed
+            : typeof parsed === "object" &&
+              parsed.images &&
+              Array.isArray(parsed.images)
+            ? parsed.images
+            : trimmed.includes(",")
+            ? trimmed.split(",").map((s) => s.trim())
+            : [trimmed];
+        } else {
+          // Comma-separated or single value
+          rawImages = trimmed.includes(",")
+            ? trimmed.split(",").map((s) => s.trim())
+            : [trimmed];
+        }
+      }
+
+      if (Array.isArray(rawImages)) {
+        logger.debug("Processed rawImages candidate array", {
+          controller: "task.controller",
+          count: rawImages.length,
+        });
+        const base64List = rawImages.filter((img) =>
+          /^data:image\/[a-zA-Z0-9+.-]+;base64,/.test(img)
+        );
+        const nonBase64 = rawImages.filter(
+          (img) => !/^data:image\/[a-zA-Z0-9+.-]+;base64,/.test(img)
+        );
+        if (nonBase64.length) {
+          logger.warn("Ignoring non-base64 images strings in images field", {
+            controller: "task.controller",
+            ignoredCount: nonBase64.length,
+          });
+        }
+        if (base64List.length) {
+          try {
+            const uploaded = await uploadBase64Array(base64List, {
+              folder: "tasks",
+            });
+            imageUrls = imageUrls.concat(uploaded);
+            logger.info("Converted base64 task images to S3 URLs", {
+              controller: "task.controller",
+              uploadedCount: uploaded.length,
+            });
+          } catch (imgErr) {
+            logger.error("Failed converting base64 images", {
+              controller: "task.controller",
+              error: imgErr.message,
+            });
+          }
+        }
+      }
+    }
+
     const taskData = {
       title,
       categories: Array.isArray(category)
@@ -182,7 +280,7 @@ exports.createTask = async (req, res) => {
       details,
       budget: Number(budget),
       currency,
-      images: req.files?.map((file) => file.location) || [],
+      images: imageUrls,
       status: "open",
       createdBy: req.user._id,
       dateType,
@@ -206,7 +304,7 @@ exports.createTask = async (req, res) => {
       };
 
       logger.debug("Adding moving details to task", {
-      controller: "task.controller",
+        controller: "task.controller",
         movingDetails: taskData.movingDetails,
       });
     }
@@ -227,7 +325,7 @@ exports.createTask = async (req, res) => {
       logger.info("Task creation notification sent successfully");
     } catch (notificationError) {
       logger.warn("Error sending task creation notification", {
-      controller: "task.controller",
+        controller: "task.controller",
         error: notificationError.message,
       });
     }
@@ -270,7 +368,7 @@ exports.getTasks = async (req, res) => {
       limit = 10,
     } = req.query;
 
-    const query = {};
+    const query = { isActive: 1 };
 
     if (category) {
       query.category = { $regex: category, $options: "i" };
@@ -378,7 +476,7 @@ exports.getTasks = async (req, res) => {
 
 exports.getTask = async (req, res) => {
   try {
-    const task = await Task.findById(req.params.id)
+    const task = await Task.findOne({ _id: req.params.id, isActive: 1 })
       .populate("createdBy", "name avatar rating firstName lastName")
       .populate("assignedTo", "name avatar")
       .lean();
@@ -461,9 +559,12 @@ exports.updateTask = async (req, res) => {
     const taskId = req.params.id;
     const updates = req.body;
     logger.debug("Update task request", {
-      controller: "task.controller", taskId, updates });
+      controller: "task.controller",
+      taskId,
+      updates,
+    });
 
-    const task = await Task.findById(taskId);
+    const task = await Task.findOne({ _id: taskId, isActive: 1 });
     if (!task) {
       return res.status(404).json({
         success: false,
@@ -546,10 +647,12 @@ exports.updateTask = async (req, res) => {
     }
 
     logger.debug("Update data to be applied", {
-      controller: "task.controller", updateData });
+      controller: "task.controller",
+      updateData,
+    });
 
-    const updatedTask = await Task.findByIdAndUpdate(
-      taskId,
+    const updatedTask = await Task.findOneAndUpdate(
+      { _id: taskId, isActive: 1 },
       { $set: updateData },
       { new: true, runValidators: true }
     ).populate("createdBy", "name avatar rating");
@@ -579,7 +682,10 @@ exports.deleteTask = async (req, res) => {
     const userId = req.user._id;
 
     logger.debug("Delete task request", {
-      controller: "task.controller", taskId, userId });
+      controller: "task.controller",
+      taskId,
+      userId,
+    });
 
     if (!mongoose.Types.ObjectId.isValid(taskId)) {
       return res.status(400).json({
@@ -588,10 +694,12 @@ exports.deleteTask = async (req, res) => {
       });
     }
 
-    const taskExists = await Task.findById(taskId);
+    const taskExists = await Task.findOne({ _id: taskId, isActive: 1 });
     if (!taskExists) {
       logger.warn("Task not found in database", {
-      controller: "task.controller", taskId });
+        controller: "task.controller",
+        taskId,
+      });
       return res.status(404).json({
         success: false,
         error: "Task not found",
@@ -609,10 +717,13 @@ exports.deleteTask = async (req, res) => {
     const task = await Task.findOne({
       _id: taskId,
       createdBy: userId,
+      isActive: 1,
     });
 
     logger.debug("Task found for deletion", {
-      controller: "task.controller", taskId: task ? task._id : null });
+      controller: "task.controller",
+      taskId: task ? task._id : null,
+    });
 
     if (!task) {
       return res.status(404).json({
@@ -629,16 +740,26 @@ exports.deleteTask = async (req, res) => {
       });
     }
 
-    logger.debug("Deleting offers for taskId", {
-      controller: "task.controller", taskId });
-    const offerDeleteResult = await Offer.deleteMany({ taskId: taskId });
-    logger.debug("Deleted offers", {
-      controller: "task.controller", count: offerDeleteResult.deletedCount });
+    logger.debug("Soft deleting offers for taskId", {
+      controller: "task.controller",
+      taskId,
+    });
+    const offerDeleteResult = await taskRepository.softDeleteOffers(taskId);
+    logger.debug("Soft deleted offers", {
+      controller: "task.controller",
+      count: offerDeleteResult.modifiedCount,
+    });
 
-    logger.debug("Deleting task", {
-      controller: "task.controller", taskId });
-    await Task.findByIdAndDelete(taskId);
-    logger.info("Task deleted successfully");
+    logger.debug("Soft deleting task", {
+      controller: "task.controller",
+      taskId,
+    });
+    await taskRepository.softDeleteTask(taskId, userId);
+    logger.info("Task soft deleted successfully", {
+      controller: "task.controller",
+      taskId,
+      userId,
+    });
 
     res.status(200).json({
       success: true,
@@ -661,24 +782,44 @@ exports.createTaskOffer = async (req, res) => {
   try {
     logger.debug("Incoming offer creation request");
 
-    const { amount, message } = req.body;
+    const { offerAmount, amount, currency, message, estimatedDuration } =
+      req.body;
     const taskId = req.params.id;
     const taskTakerId = req.user._id;
 
-    if (!amount || isNaN(Number(amount))) {
+    const selectedAmount =
+      offerAmount !== undefined && offerAmount !== null && offerAmount !== ""
+        ? offerAmount
+        : amount;
+
+    if (
+      selectedAmount === undefined ||
+      selectedAmount === null ||
+      selectedAmount === ""
+    ) {
       return res.status(400).json({
         success: false,
         error: "Valid amount is required",
       });
     }
-    if (Number(amount) <= 0) {
+
+    const numericAmount = Number(selectedAmount);
+
+    if (Number.isNaN(numericAmount)) {
+      return res.status(400).json({
+        success: false,
+        error: "Valid amount is required",
+      });
+    }
+
+    if (numericAmount <= 0) {
       return res.status(400).json({
         success: false,
         error: "Amount must be positive",
       });
     }
 
-    const task = await Task.findById(taskId);
+    const task = await Task.findOne({ _id: taskId, isActive: 1 });
     if (!task) {
       return res.status(404).json({
         success: false,
@@ -695,16 +836,17 @@ exports.createTaskOffer = async (req, res) => {
 
     logger.debug("Creating offer for task");
 
-    const offerCurrency = task.currency || "USD";
+    const offerCurrency = currency || task.currency || "LKR";
 
     const newOffer = new Offer({
       taskId: taskId,
       taskCreatorId: task.createdBy,
       taskTakerId: taskTakerId,
       offer: {
-        amount: Number(amount),
+        amount: numericAmount,
         currency: offerCurrency,
         message: message?.trim(),
+        estimatedDuration: estimatedDuration?.trim?.() || undefined,
       },
       status: "pending",
     });
@@ -739,20 +881,22 @@ exports.createTaskOffer = async (req, res) => {
         populatedOffer.taskCreatorId
       );
       logger.info("Offer notification sent successfully", {
-      controller: "task.controller",
+        controller: "task.controller",
         taskId,
         providerId: req.user._id,
       });
     } catch (notificationError) {
       logger.warn("Error sending offer notification", {
-      controller: "task.controller",
+        controller: "task.controller",
         error: notificationError.message,
         taskId,
       });
     }
 
     logger.info("Offer created successfully", {
-      controller: "task.controller", offerId: populatedOffer._id });
+      controller: "task.controller",
+      offerId: populatedOffer._id,
+    });
     res.status(201).json({
       success: true,
       data: populatedOffer,
@@ -769,20 +913,36 @@ exports.createTaskOffer = async (req, res) => {
 exports.searchTasks = async (req, res) => {
   try {
     const {
-      search,
+      search, // primary search param (may be undefined)
+      q, // alias commonly used by clients
+      term, // another occasional alias
       categories,
+      category, // alias
       location,
       minPrice,
       maxPrice,
+      minBudget, // alias
+      maxBudget, // alias
+      status, // optional explicit status
       filters,
       sort = "recommended",
     } = req.query;
 
     logger.debug("Search params received", {
-      controller: "task.controller", categories, filters });
+      controller: "task.controller",
+      categories: categories || category,
+      filters,
+    });
 
-    const query = {};
+    const query = { isActive: 1 };
     let categoryArray = [];
+
+    // Default to only open tasks unless explicitly requested otherwise
+    if (status) {
+      query.status = status;
+    } else {
+      query.status = "open";
+    }
 
     if (filters) {
       const filterArray = Array.isArray(filters) ? filters : [filters];
@@ -805,11 +965,23 @@ exports.searchTasks = async (req, res) => {
       });
     }
 
-    if (categories) {
-      if (Array.isArray(categories)) {
-        categoryArray = categories;
-      } else if (typeof categories === "string") {
-        categoryArray = categories.split(",");
+    const incomingCategories = categories || category;
+    if (incomingCategories) {
+      if (Array.isArray(incomingCategories)) {
+        categoryArray = incomingCategories;
+      } else if (typeof incomingCategories === "string") {
+        // try to parse JSON array first, else comma-split
+        const trimmed = incomingCategories.trim();
+        if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) categoryArray = parsed;
+          } catch (_) {
+            categoryArray = incomingCategories.split(",");
+          }
+        } else {
+          categoryArray = incomingCategories.split(",");
+        }
       }
 
       categoryArray = [
@@ -823,25 +995,27 @@ exports.searchTasks = async (req, res) => {
       }
     }
 
-    if (minPrice !== "undefined" || maxPrice !== "undefined") {
-      if (minPrice !== "All" && maxPrice !== "All") {
+    const effMin = minPrice ?? minBudget;
+    const effMax = maxPrice ?? maxBudget;
+    if (effMin !== "undefined" || effMax !== "undefined") {
+      if (effMin !== "All" && effMax !== "All") {
         query.budget = {};
 
-        if (minPrice && minPrice !== "undefined") {
-          const min = parseFloat(minPrice);
+        if (effMin && effMin !== "undefined") {
+          const min = parseFloat(effMin);
           if (!isNaN(min)) {
             query.budget.$gte = min;
           }
         }
 
-        if (maxPrice && maxPrice !== "undefined") {
-          if (maxPrice.includes("+")) {
-            const minValue = parseFloat(maxPrice.replace("+", ""));
+        if (effMax && effMax !== "undefined") {
+          if (typeof effMax === "string" && effMax.includes("+")) {
+            const minValue = parseFloat(effMax.replace("+", ""));
             if (!isNaN(minValue)) {
               query.budget = { $gte: minValue };
             }
           } else {
-            const max = parseFloat(maxPrice);
+            const max = parseFloat(effMax);
             if (!isNaN(max)) {
               query.budget.$lte = max;
             }
@@ -862,15 +1036,20 @@ exports.searchTasks = async (req, res) => {
       }
     }
 
-    if (search && search !== "undefined") {
+    // Resolve keyword from search | q | term
+    const rawKeyword = (search ?? q ?? term ?? "").toString().trim();
+    const hasKeyword = rawKeyword.length > 0 && rawKeyword !== "undefined";
+    if (hasKeyword) {
       query.$or = [
-        { title: { $regex: search, $options: "i" } },
-        { details: { $regex: search, $options: "i" } },
+        { title: { $regex: rawKeyword, $options: "i" } },
+        { details: { $regex: rawKeyword, $options: "i" } },
       ];
     }
 
     logger.debug("Final query", {
-      controller: "task.controller", query });
+      controller: "task.controller",
+      query,
+    });
 
     const getSortQueryForAggregation = (sort) => {
       switch (sort) {
@@ -1026,7 +1205,7 @@ exports.getTaskQuestions = async (req, res) => {
       });
     }
 
-    const task = await Task.findById(taskId);
+    const task = await Task.findOne({ _id: taskId, isActive: 1 });
     if (!task) {
       return res.status(404).json({
         success: false,
@@ -1107,7 +1286,7 @@ exports.createQuestion = async (req, res) => {
       });
     }
 
-    const task = await Task.findById(taskId);
+    const task = await Task.findOne({ _id: taskId, isActive: 1 });
     if (!task) {
       return res.status(404).json({
         success: false,
@@ -1115,10 +1294,41 @@ exports.createQuestion = async (req, res) => {
       });
     }
 
-    const imageUrls = req.files ? req.files.map((file) => file.location) : [];
-
-    if (imageUrls.length > 0) {
-      imageUrls.forEach((url, index) => {});
+    // Images: prefer multipart; fallback to base64 data URLs in body
+    let imageUrls = req.files ? req.files.map((file) => file.location) : [];
+    if (!imageUrls.length && req.body.images) {
+      let rawImages = req.body.images;
+      if (typeof rawImages === "string") {
+        try {
+          rawImages = JSON.parse(rawImages);
+        } catch (e) {
+          rawImages = rawImages.includes(",")
+            ? rawImages.split(",").map((s) => s.trim())
+            : [rawImages.trim()];
+        }
+      }
+      if (Array.isArray(rawImages)) {
+        const base64List = rawImages.filter((img) =>
+          /^data:image\/[a-zA-Z0-9+.-]+;base64,/.test(img)
+        );
+        if (base64List.length) {
+          try {
+            const uploaded = await uploadBase64Array(base64List, {
+              folder: "qa",
+            });
+            imageUrls = imageUrls.concat(uploaded);
+            logger.info("Question base64 images uploaded", {
+              controller: "task.controller",
+              uploadedCount: uploaded.length,
+            });
+          } catch (imgErr) {
+            logger.error("Failed uploading question base64 images", {
+              controller: "task.controller",
+              error: imgErr.message,
+            });
+          }
+        }
+      }
     }
 
     const question = new Question({
@@ -1194,7 +1404,41 @@ exports.answerQuestion = async (req, res) => {
       });
     }
 
-    const imageUrls = req.files ? req.files.map((file) => file.location) : [];
+    let imageUrls = req.files ? req.files.map((file) => file.location) : [];
+    if (!imageUrls.length && req.body.images) {
+      let rawImages = req.body.images;
+      if (typeof rawImages === "string") {
+        try {
+          rawImages = JSON.parse(rawImages);
+        } catch (e) {
+          rawImages = rawImages.includes(",")
+            ? rawImages.split(",").map((s) => s.trim())
+            : [rawImages.trim()];
+        }
+      }
+      if (Array.isArray(rawImages)) {
+        const base64List = rawImages.filter((img) =>
+          /^data:image\/[a-zA-Z0-9+.-]+;base64,/.test(img)
+        );
+        if (base64List.length) {
+          try {
+            const uploaded = await uploadBase64Array(base64List, {
+              folder: "qa",
+            });
+            imageUrls = imageUrls.concat(uploaded);
+            logger.info("Answer base64 images uploaded", {
+              controller: "task.controller",
+              uploadedCount: uploaded.length,
+            });
+          } catch (imgErr) {
+            logger.error("Failed uploading answer base64 images", {
+              controller: "task.controller",
+              error: imgErr.message,
+            });
+          }
+        }
+      }
+    }
 
     question.answer = {
       text: answerText.trim(),
@@ -1228,13 +1472,15 @@ exports.answerQuestion = async (req, res) => {
 exports.getMyTasks = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { section, subsection } = req.query;
+    const { section, subsection, subSection, status, role } = req.query;
 
-    const tasks = await taskService.getMyTasksWithOffers(
-      userId,
+    const tasks = await taskService.getMyTasksWithOffers(userId, {
       section,
-      subsection
-    );
+      subsection,
+      subSection,
+      status,
+      role,
+    });
 
     return res.status(200).json({
       success: true,
@@ -1478,3 +1724,273 @@ exports.getTaskWithOffers = async (req, res) => {
   }
 };
 
+// New: get similar tasks that have offers
+exports.getSimilarOfferTasks = async (req, res) => {
+  try {
+    const taskId = req.params.id;
+    const { q, limit } = req.query;
+
+    const results = await taskServices.getSimilarOfferTasksService(taskId, {
+      q,
+      limit: limit ? Number(limit) : 10,
+    });
+
+    return res.status(200).json({
+      success: true,
+      count: results.length,
+      data: results,
+    });
+  } catch (error) {
+    logger.error("Error fetching similar offer tasks:", {
+      controller: "task.controller",
+      error: error.message,
+      stack: error.stack,
+    });
+    let status = 500;
+    if (error.message.includes("Invalid task ID")) status = 400;
+    if (error.message.includes("Task not found")) status = 404;
+    return res.status(status).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Filter and sort tasks with comprehensive options
+ * @route GET /api/tasks/filter
+ * @query {string} sortBy - price-high, price-low, earliest, latest, oldest, nearest
+ * @query {number} lat - User latitude (required for nearest)
+ * @query {number} lng - User longitude (required for nearest)
+ * @query {number} radius - Search radius in km (default: 50)
+ * @query {string} categories - Comma-separated categories
+ * @query {number} minBudget - Minimum budget
+ * @query {number} maxBudget - Maximum budget
+ * @query {string} status - Task status (default: open)
+ * @query {string} locationType - In-person or Online
+ * @query {number} page - Page number (default: 1)
+ * @query {number} limit - Items per page (default: 20)
+ */
+exports.filterTasks = async (req, res) => {
+  try {
+    const {
+      sortBy = "latest",
+      lat,
+      lng,
+      radius = 50,
+      categories,
+      minBudget,
+      maxBudget,
+      status = "open",
+      locationType,
+      page = 1,
+      limit = 20,
+      search,
+    } = req.query;
+
+    logger.info("Filter tasks request", {
+      controller: "task.controller",
+      sortBy,
+      lat,
+      lng,
+      radius,
+      categories,
+      status,
+    });
+
+    // Build query
+    const query = { isActive: 1, status };
+
+    // Category filter
+    if (categories) {
+      const categoryArray = categories.split(",").map((c) => c.trim());
+      if (categoryArray.length > 0) {
+        query.categories = { $in: categoryArray };
+      }
+    }
+
+    // Budget filter
+    if (minBudget || maxBudget) {
+      query.budget = {};
+      if (minBudget) query.budget.$gte = Number(minBudget);
+      if (maxBudget) query.budget.$lte = Number(maxBudget);
+    }
+
+    // Location type filter
+    if (locationType) {
+      query.locationType = locationType;
+    }
+
+    // Search filter
+    if (search && search.trim()) {
+      query.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { details: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // Build sort options
+    let sortOptions = {};
+    let useGeoSearch = false;
+
+    switch (sortBy) {
+      case "price-high":
+      case "price-high-to-low":
+      case "highest-budget":
+        sortOptions = { budget: -1, createdAt: -1 };
+        break;
+
+      case "price-low":
+      case "price-low-to-high":
+      case "lowest-budget":
+        sortOptions = { budget: 1, createdAt: -1 };
+        break;
+
+      case "earliest":
+        sortOptions = { "dateRange.start": 1, createdAt: -1 };
+        break;
+
+      case "latest":
+      case "newest":
+        sortOptions = { createdAt: -1 };
+        break;
+
+      case "oldest":
+        sortOptions = { createdAt: 1 };
+        break;
+
+      case "nearest":
+      case "closest":
+        useGeoSearch = true;
+        if (!lat || !lng) {
+          return res.status(400).json({
+            success: false,
+            error: "Latitude and longitude are required for nearest sorting",
+          });
+        }
+        break;
+
+      default:
+        sortOptions = { createdAt: -1 };
+    }
+
+    let tasks;
+    let total;
+
+    if (useGeoSearch && lat && lng) {
+      // Geo-spatial search for nearest tasks
+      const userLat = parseFloat(lat);
+      const userLng = parseFloat(lng);
+      const radiusInMeters = parseFloat(radius) * 1000;
+
+      if (isNaN(userLat) || isNaN(userLng)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid latitude or longitude",
+        });
+      }
+
+      // Use aggregation for geospatial search
+      const pipeline = [
+        {
+          $geoNear: {
+            near: {
+              type: "Point",
+              coordinates: [userLng, userLat],
+            },
+            distanceField: "distance",
+            maxDistance: radiusInMeters,
+            spherical: true,
+            query: query,
+          },
+        },
+        {
+          $lookup: {
+            from: "users",
+            localField: "createdBy",
+            foreignField: "_id",
+            as: "createdByUser",
+          },
+        },
+        {
+          $addFields: {
+            createdBy: { $arrayElemAt: ["$createdByUser", 0] },
+          },
+        },
+        {
+          $project: {
+            createdByUser: 0,
+          },
+        },
+        { $skip: (page - 1) * limit },
+        { $limit: parseInt(limit) },
+      ];
+
+      tasks = await Task.aggregate(pipeline);
+
+      // Get total count for pagination
+      const countPipeline = [
+        {
+          $geoNear: {
+            near: {
+              type: "Point",
+              coordinates: [userLng, userLat],
+            },
+            distanceField: "distance",
+            maxDistance: radiusInMeters,
+            spherical: true,
+            query: query,
+          },
+        },
+        { $count: "total" },
+      ];
+
+      const countResult = await Task.aggregate(countPipeline);
+      total = countResult.length > 0 ? countResult[0].total : 0;
+    } else {
+      // Regular query with sorting
+      const skip = (page - 1) * limit;
+
+      tasks = await Task.find(query)
+        .populate("createdBy", "firstName lastName avatar rating")
+        .populate("assignedTo", "firstName lastName avatar rating")
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean();
+
+      total = await Task.countDocuments(query);
+    }
+
+    const totalPages = Math.ceil(total / limit);
+
+    logger.info("Filter tasks response", {
+      controller: "task.controller",
+      count: tasks.length,
+      total,
+      page,
+      totalPages,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: tasks,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages,
+        totalItems: total,
+        itemsPerPage: parseInt(limit),
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    });
+  } catch (error) {
+    logger.error("Error filtering tasks", {
+      controller: "task.controller",
+      error: error.message,
+      stack: error.stack,
+    });
+    return res.status(500).json({
+      success: false,
+      error: "Server error while filtering tasks",
+      message: error.message,
+    });
+  }
+};
