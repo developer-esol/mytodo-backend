@@ -5,15 +5,10 @@ const User = require("../../models/user/User");
 const Question = require("../../models/task/Question");
 const Chat = require("../../models/chat/Chat");
 const logger = require("../../config/logger");
-// Image upload helpers (S3)
 const { uploadBase64Array } = require("../../utils/imageUpload");
-const taskServices = require("../../servicesN/tasks/tasks.services");
-
 const taskService = require("../../servicesN/tasks/tasks.services");
 const taskRepository = require("../../repository/task/task.repository");
 const notificationService = require("../../shared/services/notificationService");
-// Image upload helpers (S3)
-const { uploadBase64Array } = require("../../utils/imageUpload");
 
 exports.createTask = async (req, res) => {
   try {

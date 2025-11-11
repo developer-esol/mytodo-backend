@@ -34,6 +34,26 @@ const http = require("http");
 const socketIo = require("socket.io");
 const logger = require("./config/logger");
 
+// Handle uncaught exceptions
+process.on("uncaughtException", (err) => {
+  logger.error("UNCAUGHT EXCEPTION! Shutting down...", {
+    file: "server.js",
+    error: err.message,
+    stack: err.stack,
+  });
+  process.exit(1);
+});
+
+// Handle unhandled promise rejections
+process.on("unhandledRejection", (err) => {
+  logger.error("UNHANDLED REJECTION! Shutting down...", {
+    file: "server.js",
+    error: err.message,
+    stack: err.stack,
+  });
+  process.exit(1);
+});
+
 // Connect to database before starting server
 connectDB()
   .then(() => {

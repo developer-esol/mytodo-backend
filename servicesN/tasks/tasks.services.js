@@ -170,6 +170,7 @@ const getMyTasksWithOffers = async (userId, options = {}) => {
   if (!isValidObjectId(userId)) {
     throw new Error("Invalid user ID");
   }
+  npm;
 
   const { section, subsection, subSection, status, role } = options;
 
@@ -760,10 +761,7 @@ const getSimilarOfferTasksService = async (taskId, { q, limit = 10 } = {}) => {
   const matchStage = {
     _id: { $ne: source._id },
     status: { $in: ["open", "assigned", "in-progress"] },
-<<<<<<< HEAD
     isActive: 1,
-=======
->>>>>>> fb532603d7d06d638ea0091cfda8592e56af62bf
   };
   if (categories.length) {
     matchStage.categories = { $in: categories };
