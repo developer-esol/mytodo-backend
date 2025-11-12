@@ -1,12 +1,14 @@
 # 🚨 NPM ERROR FIX GUIDE
 
 ## Problem
+
 ```
 ReferenceError: npm is not defined
 at servicesN/tasks/tasks.services.js:173:3
 ```
 
 ## Root Cause
+
 There's a typo on **line 173** of `tasks.services.js` on your **production server** (`/var/www/mytodoo/mytodo-backend/`).
 
 Someone accidentally typed `npm;` (probably a typo or accidental keypress).
@@ -72,6 +74,7 @@ pm2 restart mytodo-backend
 On line 173 of `/var/www/mytodoo/mytodo-backend/servicesN/tasks/tasks.services.js`:
 
 **BAD (Current):**
+
 ```javascript
 const getMyTasksWithOffers = async (userId, options = {}) => {
   if (!isValidObjectId(userId)) {
@@ -83,6 +86,7 @@ const getMyTasksWithOffers = async (userId, options = {}) => {
 ```
 
 **GOOD (After Fix):**
+
 ```javascript
 const getMyTasksWithOffers = async (userId, options = {}) => {
   if (!isValidObjectId(userId)) {
@@ -123,6 +127,7 @@ You should no longer see the "npm is not defined" error.
 ## Need Help?
 
 If the error persists after fixing:
+
 1. Make sure you restarted the server: `pm2 restart mytodo-backend`
 2. Check you edited the correct file: `ls -la /var/www/mytodoo/mytodo-backend/servicesN/tasks/tasks.services.js`
 3. Verify line 173: `sed -n '170,176p' /var/www/mytodoo/mytodo-backend/servicesN/tasks/tasks.services.js`

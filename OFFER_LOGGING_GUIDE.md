@@ -87,6 +87,7 @@ Added detailed debug and info logging to all offer-related endpoints in `control
 ### 2. **Create Offer - Validation Failures**
 
 #### Amount Missing:
+
 ```log
 [warn]: ❌ Offer creation failed: Amount missing
   - taskId: 507f1f77bcf86cd799439012
@@ -96,6 +97,7 @@ Added detailed debug and info logging to all offer-related endpoints in `control
 ```
 
 #### Invalid Amount Format:
+
 ```log
 [warn]: ❌ Offer creation failed: Invalid amount format
   - selectedAmount: "abc"
@@ -103,12 +105,14 @@ Added detailed debug and info logging to all offer-related endpoints in `control
 ```
 
 #### Negative Amount:
+
 ```log
 [warn]: ❌ Offer creation failed: Negative amount
   - numericAmount: -500
 ```
 
 #### Task Not Found:
+
 ```log
 [warn]: ❌ Offer creation failed: Task not found
   - taskId: 507f1f77bcf86cd799439012
@@ -116,6 +120,7 @@ Added detailed debug and info logging to all offer-related endpoints in `control
 ```
 
 #### User Offering on Own Task:
+
 ```log
 [warn]: ❌ Offer creation failed: User trying to offer on own task
   - taskId: 507f1f77bcf86cd799439012
@@ -124,12 +129,14 @@ Added detailed debug and info logging to all offer-related endpoints in `control
 ```
 
 #### Task Not Accepting Offers:
+
 ```log
 [warn]: ❌ Offer creation failed: Task not accepting offers
   - taskStatus: completed  ← Not "open"
 ```
 
 #### Duplicate Offer:
+
 ```log
 [warn]: ❌ Offer creation failed: Duplicate offer
   - existingOfferId: 507f1f77bcf86cd799439013
@@ -209,7 +216,9 @@ Added detailed debug and info logging to all offer-related endpoints in `control
 ## 📋 Logged Functions
 
 ### ✅ Fully Instrumented:
+
 1. **`exports.createTaskOffer`** - Create new offer
+
    - All validation steps
    - Database operations
    - Chat creation
@@ -217,6 +226,7 @@ Added detailed debug and info logging to all offer-related endpoints in `control
    - Success/failure paths
 
 2. **`exports.acceptOffer`** - Accept an offer
+
    - Request received
    - Service call
    - Success/error handling
@@ -231,33 +241,39 @@ Added detailed debug and info logging to all offer-related endpoints in `control
 ## 🎯 How to Use These Logs
 
 ### Monitor Real-Time:
+
 ```bash
 # On production server
 pm2 logs mytodo-backend | grep "offer"
 ```
 
 ### Filter by Function:
+
 ```bash
 pm2 logs mytodo-backend | grep "createTaskOffer"
 pm2 logs mytodo-backend | grep "acceptOffer"
 ```
 
 ### View Errors Only:
+
 ```bash
 pm2 logs mytodo-backend | grep "❌"
 ```
 
 ### View Success Only:
+
 ```bash
 pm2 logs mytodo-backend | grep "✅"
 ```
 
 ### Trace a Specific Task:
+
 ```bash
 pm2 logs mytodo-backend | grep "507f1f77bcf86cd799439012"
 ```
 
 ### Trace a Specific User:
+
 ```bash
 pm2 logs mytodo-backend | grep "userId.*507f1f77bcf86cd799439011"
 ```
@@ -267,30 +283,41 @@ pm2 logs mytodo-backend | grep "userId.*507f1f77bcf86cd799439011"
 ## 🔍 Debugging Scenarios
 
 ### Scenario 1: User says "My offer didn't go through"
+
 Look for:
+
 ```log
 [warn]: ❌ Offer creation failed
 ```
+
 Check the reason (amount, duplicate, permissions, etc.)
 
 ### Scenario 2: Offer created but no notification
+
 Look for:
+
 ```log
 [warn]: ⚠️ Error sending offer notification
 ```
 
 ### Scenario 3: Server crash on offer creation
+
 Look for:
+
 ```log
 [error]: ❌ FATAL ERROR in createTaskOffer
 ```
+
 Check the stack trace and request body
 
 ### Scenario 4: Duplicate offers somehow getting through
+
 Look for:
+
 ```log
 [debug]: Checking for existing offers
 ```
+
 Verify the check is happening before save
 
 ---

@@ -782,7 +782,7 @@ exports.createTaskOffer = async (req, res) => {
       taskId: req.params.id,
       body: req.body,
       ip: req.ip,
-      userAgent: req.headers['user-agent']
+      userAgent: req.headers["user-agent"],
     });
 
     const { offerAmount, amount, currency, message, estimatedDuration } =
@@ -797,7 +797,7 @@ exports.createTaskOffer = async (req, res) => {
       offerAmount,
       amount,
       currency,
-      messageLength: message?.length || 0
+      messageLength: message?.length || 0,
     });
 
     const selectedAmount =
@@ -815,7 +815,7 @@ exports.createTaskOffer = async (req, res) => {
         taskId,
         userId: taskTakerId,
         offerAmount,
-        amount
+        amount,
       });
       return res.status(400).json({
         success: false,
@@ -831,7 +831,7 @@ exports.createTaskOffer = async (req, res) => {
         taskId,
         userId: taskTakerId,
         selectedAmount,
-        type: typeof selectedAmount
+        type: typeof selectedAmount,
       });
       return res.status(400).json({
         success: false,
@@ -844,7 +844,7 @@ exports.createTaskOffer = async (req, res) => {
         controller: "task.controller",
         taskId,
         userId: taskTakerId,
-        numericAmount
+        numericAmount,
       });
       return res.status(400).json({
         success: false,
@@ -854,7 +854,7 @@ exports.createTaskOffer = async (req, res) => {
 
     logger.debug("Fetching task from database", {
       controller: "task.controller",
-      taskId
+      taskId,
     });
 
     const task = await Task.findOne({ _id: taskId, isActive: 1 });
@@ -862,7 +862,7 @@ exports.createTaskOffer = async (req, res) => {
       logger.warn("❌ Offer creation failed: Task not found", {
         controller: "task.controller",
         taskId,
-        userId: taskTakerId
+        userId: taskTakerId,
       });
       return res.status(404).json({
         success: false,
@@ -875,17 +875,20 @@ exports.createTaskOffer = async (req, res) => {
       taskId,
       taskCreatorId: task.createdBy.toString(),
       taskTakerId: taskTakerId.toString(),
-      taskStatus: task.status
+      taskStatus: task.status,
     });
 
     // Check if user is trying to make an offer on their own task
     if (task.createdBy.toString() === taskTakerId.toString()) {
-      logger.warn("❌ Offer creation failed: User trying to offer on own task", {
-        controller: "task.controller",
-        taskId,
-        userId: taskTakerId,
-        taskCreatorId: task.createdBy.toString()
-      });
+      logger.warn(
+        "❌ Offer creation failed: User trying to offer on own task",
+        {
+          controller: "task.controller",
+          taskId,
+          userId: taskTakerId,
+          taskCreatorId: task.createdBy.toString(),
+        }
+      );
       return res.status(403).json({
         success: false,
         error: "You cannot make an offer on your own task",
@@ -897,7 +900,7 @@ exports.createTaskOffer = async (req, res) => {
         controller: "task.controller",
         taskId,
         userId: taskTakerId,
-        taskStatus: task.status
+        taskStatus: task.status,
       });
       return res.status(400).json({
         success: false,
@@ -908,7 +911,7 @@ exports.createTaskOffer = async (req, res) => {
     logger.debug("Checking for existing offers", {
       controller: "task.controller",
       taskId,
-      taskTakerId: taskTakerId.toString()
+      taskTakerId: taskTakerId.toString(),
     });
 
     // Check if user has already made an offer on this task
@@ -924,7 +927,7 @@ exports.createTaskOffer = async (req, res) => {
         taskId,
         userId: taskTakerId,
         existingOfferId: existingOffer._id,
-        existingOfferStatus: existingOffer.status
+        existingOfferStatus: existingOffer.status,
       });
       return res.status(400).json({
         success: false,
@@ -937,7 +940,7 @@ exports.createTaskOffer = async (req, res) => {
       taskId,
       taskTakerId: taskTakerId.toString(),
       amount: numericAmount,
-      currency: currency || task.currency || "LKR"
+      currency: currency || task.currency || "LKR",
     });
 
     const offerCurrency = currency || task.currency || "LKR";
@@ -951,8 +954,8 @@ exports.createTaskOffer = async (req, res) => {
         amount: numericAmount,
         currency: offerCurrency,
         hasMessage: !!message,
-        hasEstimatedDuration: !!estimatedDuration
-      }
+        hasEstimatedDuration: !!estimatedDuration,
+      },
     });
 
     const newOffer = new Offer({
@@ -970,7 +973,7 @@ exports.createTaskOffer = async (req, res) => {
 
     logger.debug("Saving offer to database", {
       controller: "task.controller",
-      offerId: newOffer._id
+      offerId: newOffer._id,
     });
 
     await newOffer.save();
@@ -979,7 +982,7 @@ exports.createTaskOffer = async (req, res) => {
       controller: "task.controller",
       offerId: newOffer._id,
       taskId,
-      taskTakerId: taskTakerId.toString()
+      taskTakerId: taskTakerId.toString(),
     });
 
     if (task.offers) {
@@ -987,14 +990,14 @@ exports.createTaskOffer = async (req, res) => {
         controller: "task.controller",
         taskId,
         offerId: newOffer._id,
-        currentOffersCount: task.offers.length
+        currentOffersCount: task.offers.length,
       });
       task.offers.push(newOffer._id);
       await task.save();
       logger.debug("Task updated with new offer", {
         controller: "task.controller",
         taskId,
-        totalOffers: task.offers.length
+        totalOffers: task.offers.length,
       });
     }
 
@@ -1002,7 +1005,7 @@ exports.createTaskOffer = async (req, res) => {
       controller: "task.controller",
       taskId,
       posterId: task.createdBy.toString(),
-      taskerId: taskTakerId.toString()
+      taskerId: taskTakerId.toString(),
     });
 
     const newChat = new Chat({
@@ -1018,12 +1021,12 @@ exports.createTaskOffer = async (req, res) => {
     logger.debug("Chat created successfully", {
       controller: "task.controller",
       chatId: newChat._id,
-      taskId
+      taskId,
     });
 
     logger.debug("Populating offer with user details", {
       controller: "task.controller",
-      offerId: newOffer._id
+      offerId: newOffer._id,
     });
 
     const populatedOffer = await Offer.findById(newOffer._id)
@@ -1035,7 +1038,7 @@ exports.createTaskOffer = async (req, res) => {
       controller: "task.controller",
       offerId: newOffer._id,
       taskTakerName: `${populatedOffer.taskTakerId?.firstName} ${populatedOffer.taskTakerId?.lastName}`,
-      taskCreatorName: `${populatedOffer.taskCreatorId?.firstName} ${populatedOffer.taskCreatorId?.lastName}`
+      taskCreatorName: `${populatedOffer.taskCreatorId?.firstName} ${populatedOffer.taskCreatorId?.lastName}`,
     });
 
     try {
@@ -1043,7 +1046,7 @@ exports.createTaskOffer = async (req, res) => {
         controller: "task.controller",
         offerId: newOffer._id,
         taskId,
-        toUserId: task.createdBy.toString()
+        toUserId: task.createdBy.toString(),
       });
 
       await notificationService.notifyOfferMade(
@@ -1057,7 +1060,7 @@ exports.createTaskOffer = async (req, res) => {
         controller: "task.controller",
         taskId,
         offerId: newOffer._id,
-        providerId: req.user._id
+        providerId: req.user._id,
       });
     } catch (notificationError) {
       logger.warn("⚠️ Error sending offer notification", {
@@ -1065,7 +1068,7 @@ exports.createTaskOffer = async (req, res) => {
         error: notificationError.message,
         stack: notificationError.stack,
         taskId,
-        offerId: newOffer._id
+        offerId: newOffer._id,
       });
     }
 
@@ -1076,7 +1079,7 @@ exports.createTaskOffer = async (req, res) => {
       taskTakerId: taskTakerId.toString(),
       amount: numericAmount,
       currency: offerCurrency,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     res.status(201).json({
@@ -1092,7 +1095,7 @@ exports.createTaskOffer = async (req, res) => {
       taskId: req.params.id,
       userId: req.user?._id,
       body: req.body,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
     res.status(500).json({
       success: false,
@@ -1855,7 +1858,7 @@ exports.acceptOffer = async (req, res) => {
       offerId: req.params.offerId,
       userId: req.user._id,
       ip: req.ip,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     const { taskId, offerId } = req.params;
@@ -1865,7 +1868,7 @@ exports.acceptOffer = async (req, res) => {
       controller: "task.controller",
       taskId,
       offerId,
-      userId: userId.toString()
+      userId: userId.toString(),
     });
 
     const result = await taskService.acceptOfferService(
@@ -1881,7 +1884,7 @@ exports.acceptOffer = async (req, res) => {
       offerId,
       userId: userId.toString(),
       transactionId: result.transaction?._id,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     return res.status(200).json({
@@ -1898,7 +1901,7 @@ exports.acceptOffer = async (req, res) => {
       taskId: req.params.taskId,
       offerId: req.params.offerId,
       userId: req.user?._id,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     let statusCode = 500;
@@ -1932,14 +1935,14 @@ exports.getTaskWithOffers = async (req, res) => {
       taskId: req.params.id,
       userId: req.user?._id,
       ip: req.ip,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     const taskId = req.params.id;
 
     logger.debug("Fetching task with offers", {
       controller: "task.controller",
-      taskId
+      taskId,
     });
 
     const taskWithOffers = await taskService.getTaskWithOffersService(taskId);
@@ -1949,7 +1952,7 @@ exports.getTaskWithOffers = async (req, res) => {
       taskId,
       offersCount: taskWithOffers.offersCount,
       taskStatus: taskWithOffers.status,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     return res.status(200).json({
@@ -1963,7 +1966,7 @@ exports.getTaskWithOffers = async (req, res) => {
       error: error.message,
       stack: error.stack,
       taskId: req.params.id,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     let statusCode = 500;
