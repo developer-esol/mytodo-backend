@@ -33,7 +33,7 @@ exports.protect = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log("✅ Token Verified Successfully");
     console.log("📦 Decoded Token:", JSON.stringify(decoded, null, 2));
-    
+
     logger.debug("Token verified", {
       middleware: "authMiddleware",
       userId: decoded._id || decoded.user?.id || decoded.id,
@@ -60,9 +60,9 @@ exports.protect = async (req, res, next) => {
       email: req.user?.email,
       firstName: req.user?.firstName,
       lastName: req.user?.lastName,
-      role: req.user?.role
+      role: req.user?.role,
     });
-    
+
     logger.debug("User authenticated", {
       middleware: "authMiddleware",
       userId,
@@ -99,13 +99,13 @@ exports.protect = async (req, res, next) => {
 
     console.log("✅ Authentication Successful - User attached to request");
     console.log("═".repeat(80));
-    
+
     next();
   } catch (err) {
     console.log("❌ Authentication Error:", err.message);
     console.log("Error Type:", err.name);
     console.log("Stack:", err.stack);
-    
+
     logger.error("Authentication error", {
       middleware: "authMiddleware",
       error: err.message,
@@ -151,7 +151,10 @@ exports.authenticateUser = async (req, res, next) => {
     // 2. Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log("✅ [authenticateUser] Token Verified");
-    console.log("📦 [authenticateUser] Decoded:", JSON.stringify(decoded, null, 2));
+    console.log(
+      "📦 [authenticateUser] Decoded:",
+      JSON.stringify(decoded, null, 2)
+    );
 
     // 3. Check token structure
     if (!decoded.user?.id) {
@@ -172,7 +175,7 @@ exports.authenticateUser = async (req, res, next) => {
       userId: decoded.user.id,
       email: user?.email,
       firstName: user?.firstName,
-      isVerified: user?.isVerified
+      isVerified: user?.isVerified,
     });
 
     if (!user) {
@@ -219,7 +222,7 @@ exports.authenticateUser = async (req, res, next) => {
   } catch (err) {
     console.log("❌ [authenticateUser] Error:", err.message);
     console.log("Error Type:", err.name);
-    
+
     logger.error("Authentication error in authenticateUser", {
       middleware: "authMiddleware",
       error: err.message,
