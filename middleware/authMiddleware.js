@@ -10,7 +10,14 @@ exports.protect = async (req, res, next) => {
       token = req.headers.authorization.split(" ")[1];
     }
 
+    // Console log the token every time
+    console.log("🔐 Token Received:", token);
+    console.log("📍 Request Path:", req.path);
+    console.log("🕒 Time:", new Date().toISOString());
+    console.log("─".repeat(80));
+
     if (!token) {
+      console.log("❌ No token provided");
       logger.warn("Unauthorized access attempt - no token provided", {
         middleware: "authMiddleware",
         path: req.path,
@@ -24,6 +31,9 @@ exports.protect = async (req, res, next) => {
 
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log("✅ Token Verified Successfully");
+    console.log("📦 Decoded Token:", JSON.stringify(decoded, null, 2));
+    
     logger.debug("Token verified", {
       middleware: "authMiddleware",
       userId: decoded._id || decoded.user?.id || decoded.id,
@@ -45,6 +55,14 @@ exports.protect = async (req, res, next) => {
     }
 
     req.user = await User.findById(userId).select("-password");
+    console.log("👤 User Found:", {
+      userId,
+      email: req.user?.email,
+      firstName: req.user?.firstName,
+      lastName: req.user?.lastName,
+      role: req.user?.role
+    });
+    
     logger.debug("User authenticated", {
       middleware: "authMiddleware",
       userId,
@@ -52,6 +70,7 @@ exports.protect = async (req, res, next) => {
     });
 
     if (!req.user) {
+      console.log("❌ User not found in database for userId:", userId);
       logger.warn("User not found in database", {
         middleware: "authMiddleware",
         userId,
@@ -78,8 +97,15 @@ exports.protect = async (req, res, next) => {
       req.user.lastName = "";
     }
 
+    console.log("✅ Authentication Successful - User attached to request");
+    console.log("═".repeat(80));
+    
     next();
   } catch (err) {
+    console.log("❌ Authentication Error:", err.message);
+    console.log("Error Type:", err.name);
+    console.log("Stack:", err.stack);
+    
     logger.error("Authentication error", {
       middleware: "authMiddleware",
       error: err.message,
@@ -103,7 +129,14 @@ exports.authenticateUser = async (req, res, next) => {
       token = req.cookies.token;
     }
 
+    // Console log the token
+    console.log("🔐 [authenticateUser] Token Received:", token);
+    console.log("📍 [authenticateUser] Request Path:", req.path);
+    console.log("🕒 [authenticateUser] Time:", new Date().toISOString());
+    console.log("─".repeat(80));
+
     if (!token) {
+      console.log("❌ [authenticateUser] No token provided");
       logger.warn("Unauthorized access attempt - no token", {
         middleware: "authMiddleware",
         path: req.path,
@@ -117,9 +150,12 @@ exports.authenticateUser = async (req, res, next) => {
 
     // 2. Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log("✅ [authenticateUser] Token Verified");
+    console.log("📦 [authenticateUser] Decoded:", JSON.stringify(decoded, null, 2));
 
     // 3. Check token structure
     if (!decoded.user?.id) {
+      console.log("❌ [authenticateUser] Invalid token structure");
       logger.warn("Invalid token structure in authenticateUser", {
         middleware: "authMiddleware",
         tokenKeys: Object.keys(decoded),
@@ -132,8 +168,15 @@ exports.authenticateUser = async (req, res, next) => {
 
     // 4. Get user from database
     const user = await User.findById(decoded.user.id).select("-password");
+    console.log("👤 [authenticateUser] User Found:", {
+      userId: decoded.user.id,
+      email: user?.email,
+      firstName: user?.firstName,
+      isVerified: user?.isVerified
+    });
 
     if (!user) {
+      console.log("❌ [authenticateUser] User not found");
       logger.warn("User not found during authentication", {
         middleware: "authMiddleware",
         userId: decoded.user.id,
@@ -146,6 +189,7 @@ exports.authenticateUser = async (req, res, next) => {
 
     // 5. Check if user is verified
     if (!user.isVerified) {
+      console.log("❌ [authenticateUser] User not verified");
       logger.warn("Unverified user attempting access", {
         middleware: "authMiddleware",
         userId: user._id,
@@ -168,8 +212,14 @@ exports.authenticateUser = async (req, res, next) => {
       role: user.role || "user",
     };
 
+    console.log("✅ [authenticateUser] Authentication Successful");
+    console.log("═".repeat(80));
+
     next();
   } catch (err) {
+    console.log("❌ [authenticateUser] Error:", err.message);
+    console.log("Error Type:", err.name);
+    
     logger.error("Authentication error in authenticateUser", {
       middleware: "authMiddleware",
       error: err.message,
