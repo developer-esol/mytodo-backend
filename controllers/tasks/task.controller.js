@@ -785,7 +785,7 @@ exports.createTaskOffer = async (req, res) => {
       userAgent: req.headers["user-agent"],
     });
 
-    const { offerAmount, amount, currency, message, estimatedDuration } =
+    const { amount, offerAmount, currency, message, estimatedDuration } =
       req.body;
     const taskId = req.params.id;
     const taskTakerId = req.user._id;
@@ -794,16 +794,17 @@ exports.createTaskOffer = async (req, res) => {
       controller: "task.controller",
       taskId,
       taskTakerId: taskTakerId.toString(),
-      offerAmount,
       amount,
+      offerAmount,
       currency,
       messageLength: message?.length || 0,
     });
 
+    // Prioritize 'amount' over 'offerAmount' for backward compatibility
     const selectedAmount =
-      offerAmount !== undefined && offerAmount !== null && offerAmount !== ""
-        ? offerAmount
-        : amount;
+      amount !== undefined && amount !== null && amount !== ""
+        ? amount
+        : offerAmount;
 
     if (
       selectedAmount === undefined ||

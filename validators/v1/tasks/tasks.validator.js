@@ -129,13 +129,13 @@ const createOffer = [
   param("id")
     .matches(/^[0-9a-fA-F]{24}$/)
     .withMessage("Invalid task ID format"),
-  body("offerAmount")
+  body("amount")
     .notEmpty()
-    .withMessage("Offer amount is required")
+    .withMessage("Amount is required")
     .isNumeric()
-    .withMessage("Offer amount must be a number")
-    .isFloat({ min: 0 })
-    .withMessage("Offer amount must be a positive number"),
+    .withMessage("Amount must be a number")
+    .isFloat({ min: 0.01 })
+    .withMessage("Amount must be a positive number"),
   body("currency")
     .optional()
     .isIn(["LKR", "USD", "AUD", "NZD", "EUR", "GBP"])
