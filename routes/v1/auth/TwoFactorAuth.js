@@ -141,7 +141,19 @@ router.post(
   "/otp-verification",
   ...twofactorAuthValidator.otpVerification,
   async (req, res) => {
-    const { email, otp } = req.body;
+    let { email, otp } = req.body;
+
+    // Trim and normalize email
+    email = email ? email.trim().toLowerCase() : email;
+
+    console.log("\n📥 ========================================");
+    console.log("📥 OTP VERIFICATION REQUEST RECEIVED");
+    console.log("📥 ========================================");
+    console.log("📧 Original Email from Request:", req.body.email);
+    console.log("📧 Normalized Email:", email);
+    console.log("🔑 OTP from Request:", otp);
+    console.log("📥 ========================================\n");
+
     logger.info("OTP verification request received", {
       route: "TwoFactorAuth.js",
       endpoint: "/otp-verification",
@@ -158,20 +170,60 @@ router.post(
       console.log("\n🔍 ========================================");
       console.log("🔍 OTP VERIFICATION - FINDING PENDING USER");
       console.log("🔍 ========================================");
-      console.log("📧 Email:", email);
+      console.log("📧 Searching for Email:", email);
       console.log("🔑 User Input OTP:", otp);
       console.log("⏰ Current Time:", new Date().toISOString());
       console.log("🔍 ========================================\n");
 
       const pendingUser = await PendingUser.findOne({
-        email: { $regex: new RegExp(`^${email}$`, "i") },
+        email: {
+          $regex: new RegExp(
+            `^${email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+            "i"
+          ),
+        },
       });
 
       if (!pendingUser) {
+        // Debug: Check all pending users to find similar emails
+        console.log("\n🔎 ========================================");
+        console.log("🔎 DEBUG - SEARCHING ALL PENDING USERS");
+        console.log("🔎 ========================================");
+
+        const allPendingUsers = await PendingUser.find({}).select(
+          "email createdAt"
+        );
+        console.log("📊 Total Pending Users:", allPendingUsers.length);
+        console.log("📧 Looking for:", email);
+
+        if (allPendingUsers.length > 0) {
+          console.log("\n📋 All Pending User Emails:");
+          allPendingUsers.forEach((user, index) => {
+            console.log(
+              `   ${index + 1}. ${user.email} (Created: ${user.createdAt})`
+            );
+          });
+
+          // Check for similar emails
+          const similarEmails = allPendingUsers.filter(
+            (user) => user.email.replace(/\./g, "") === email.replace(/\./g, "")
+          );
+
+          if (similarEmails.length > 0) {
+            console.log("\n⚠️  FOUND SIMILAR EMAIL(S) (dots may differ):");
+            similarEmails.forEach((user) => {
+              console.log(`   - Database: "${user.email}"`);
+              console.log(`   - Request:  "${email}"`);
+              console.log(`   - Difference: Email dots don't match!`);
+            });
+          }
+        }
+        console.log("🔎 ========================================\n");
+
         console.log("\n❌ ========================================");
         console.log("❌ OTP VERIFICATION FAILED - NO PENDING USER");
         console.log("❌ ========================================");
-        console.log("📧 Email:", email);
+        console.log("📧 Searched Email:", email);
         console.log("❌ Reason: No pending user found in database");
         console.log("❌ ========================================\n");
 

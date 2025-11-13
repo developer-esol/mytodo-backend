@@ -20,8 +20,8 @@ exports.forgotPassword = [
     .withMessage("Email is required")
     .bail()
     .isEmail()
-    .withMessage("Invalid email address")
-    .normalizeEmail(),
+    .withMessage("Invalid email address"),
+  // Removed .normalizeEmail() to preserve dots in email addresses
   validateRequest,
 ];
 
@@ -31,8 +31,8 @@ exports.resendForgotPassword = [
     .withMessage("Email is required")
     .bail()
     .isEmail()
-    .withMessage("Invalid email address")
-    .normalizeEmail(),
+    .withMessage("Invalid email address"),
+  // Removed .normalizeEmail() to preserve dots in email addresses
   validateRequest,
 ];
 
@@ -50,8 +50,8 @@ exports.resetPassword = [
     .withMessage("Email is required")
     .bail()
     .isEmail()
-    .withMessage("Invalid email address")
-    .normalizeEmail(),
+    .withMessage("Invalid email address"),
+  // Removed .normalizeEmail() to preserve dots in email addresses
   body("newPassword")
     .exists()
     .withMessage("New password is required")

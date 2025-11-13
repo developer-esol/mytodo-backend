@@ -11,8 +11,8 @@ exports.otpVerification = [
     .withMessage("Email is required")
     .bail()
     .isEmail()
-    .withMessage("Invalid email address")
-    .normalizeEmail(),
+    .withMessage("Invalid email address"),
+  // Removed .normalizeEmail() to preserve dots in email addresses
 
   body("otp")
     .exists()
@@ -33,8 +33,8 @@ exports.smsVerification = [
     .withMessage("Email is required")
     .bail()
     .isEmail()
-    .withMessage("Invalid email address")
-    .normalizeEmail(),
+    .withMessage("Invalid email address"),
+  // Removed .normalizeEmail() to preserve dots in email addresses
 
   body("otp")
     .exists()
@@ -55,8 +55,8 @@ exports.resendOtp = [
     .withMessage("Email is required")
     .bail()
     .isEmail()
-    .withMessage("Invalid email address")
-    .normalizeEmail(),
+    .withMessage("Invalid email address"),
+  // Removed .normalizeEmail() to preserve dots in email addresses
 
   body("phone")
     .optional()
@@ -75,8 +75,8 @@ exports.sendEmail = [
     .withMessage("Email is required")
     .bail()
     .isEmail()
-    .withMessage("Invalid email address")
-    .normalizeEmail(),
+    .withMessage("Invalid email address"),
+  // Removed .normalizeEmail() to preserve dots in email addresses
 
   validateRequest,
 ];
@@ -90,11 +90,8 @@ exports.checkAvailability = [
     return true;
   }),
 
-  body("email")
-    .optional()
-    .isEmail()
-    .withMessage("Invalid email address")
-    .normalizeEmail(),
+  body("email").optional().isEmail().withMessage("Invalid email address"),
+  // Removed .normalizeEmail() to preserve dots in email addresses
 
   body("phone")
     .optional()
