@@ -591,19 +591,23 @@ components:
       type: object
       required:
         - country
+        - countryCode
+        - suburb
         - region
         - city
       properties:
         country:
           type: string
-          enum: [AU, NZ, LK]
-          description: Country code
+          description: Full country name
         countryCode:
           type: string
-          description: Country code (defaults to country)
+          description: ISO 3166-1 alpha-2 country code
+        suburb:
+          type: string
+          description: Suburb or locality
         region:
           type: string
-          description: State or region
+          description: State, province, or region
         city:
           type: string
           description: City

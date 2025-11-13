@@ -13,11 +13,12 @@ const PendingUserSchema = new mongoose.Schema(
     location: {
       country: {
         type: String,
-        enum: ["AU", "NZ", "LK"],
       },
       countryCode: {
         type: String,
-        enum: ["AU", "NZ", "LK"],
+      },
+      suburb: {
+        type: String,
       },
       region: String,
       city: String,

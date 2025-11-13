@@ -14,7 +14,7 @@ const { uploadBuffer } = require("../../utils/imageUpload");
  */
 class UserService {
   constructor() {
-    this.validCountries = ["AU", "NZ", "LK"];
+    // Removed country restrictions - now accepts any country
   }
 
   /**
@@ -79,16 +79,16 @@ class UserService {
     }
 
     // Location validation
-    if (!location || !location.country || !location.region || !location.city) {
-      throw new Error("Location data is required (country, region, city)");
-    }
-
-    // Country validation
-    if (!this.validCountries.includes(location.country)) {
+    if (
+      !location ||
+      !location.country ||
+      !location.countryCode ||
+      !location.suburb ||
+      !location.region ||
+      !location.city
+    ) {
       throw new Error(
-        `Invalid country. Supported countries: ${this.validCountries.join(
-          ", "
-        )}`
+        "Location data is required (country, countryCode, suburb, region, city)"
       );
     }
 
@@ -133,10 +133,11 @@ class UserService {
       // Validate signup data
       this.validateSignupData(userData);
 
-      // Prepare location data
+      // Prepare location data with all fields
       const locationData = {
         country: location.country,
-        countryCode: location.countryCode || location.country,
+        countryCode: location.countryCode,
+        suburb: location.suburb,
         region: location.region,
         city: location.city,
       };
