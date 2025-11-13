@@ -155,18 +155,52 @@ router.post(
     }
 
     try {
+      console.log("\n🔍 ========================================");
+      console.log("🔍 OTP VERIFICATION - FINDING PENDING USER");
+      console.log("🔍 ========================================");
+      console.log("📧 Email:", email);
+      console.log("🔑 User Input OTP:", otp);
+      console.log("⏰ Current Time:", new Date().toISOString());
+      console.log("🔍 ========================================\n");
+
       const pendingUser = await PendingUser.findOne({
         email: { $regex: new RegExp(`^${email}$`, "i") },
       });
 
       if (!pendingUser) {
+        console.log("\n❌ ========================================");
+        console.log("❌ OTP VERIFICATION FAILED - NO PENDING USER");
+        console.log("❌ ========================================");
+        console.log("📧 Email:", email);
+        console.log("❌ Reason: No pending user found in database");
+        console.log("❌ ========================================\n");
+
         return res.status(400).json({
           success: false,
           message: "No pending verification found or OTP expired",
         });
       }
 
+      console.log("\n✅ ========================================");
+      console.log("✅ PENDING USER FOUND");
+      console.log("✅ ========================================");
+      console.log("📧 Email:", pendingUser.email);
+      console.log("🆔 Pending User ID:", pendingUser._id);
+      console.log("🔒 Stored Hashed OTP:", pendingUser.otp);
+      console.log("⏰ OTP Expires At:", pendingUser.otpExpires);
+      console.log("⏰ Current Time:", new Date().toISOString());
+      console.log("✅ ========================================\n");
+
       if (new Date(pendingUser.otpExpires) < new Date()) {
+        console.log("\n❌ ========================================");
+        console.log("❌ OTP EXPIRED");
+        console.log("❌ ========================================");
+        console.log("📧 Email:", email);
+        console.log("⏰ Expired At:", pendingUser.otpExpires);
+        console.log("⏰ Current Time:", new Date().toISOString());
+        console.log("❌ Deleting pending user...");
+        console.log("❌ ========================================\n");
+
         await PendingUser.deleteOne({ email });
         return res.status(400).json({
           success: false,
@@ -174,10 +208,42 @@ router.post(
         });
       }
 
+      console.log("\n🔐 ========================================");
+      console.log("🔐 COMPARING OTP WITH BCRYPT");
+      console.log("🔐 ========================================");
+      console.log("🔑 User Input (Plain):", otp);
+      console.log("🔒 Database Hash:", pendingUser.otp);
+      console.log("🔐 Comparing...");
+      console.log("🔐 ========================================\n");
+
       const isValidOTP = await bcrypt.compare(otp, pendingUser.otp);
+
+      console.log("\n🎯 ========================================");
+      console.log("🎯 OTP COMPARISON RESULT");
+      console.log("🎯 ========================================");
+      console.log("📧 Email:", email);
+      console.log("🔑 Input OTP:", otp);
+      console.log(isValidOTP ? "✅ Result: MATCH" : "❌ Result: NO MATCH");
+      console.log("🎯 ========================================\n");
+
       if (!isValidOTP) {
+        console.log("\n❌ ========================================");
+        console.log("❌ INVALID OTP - VERIFICATION FAILED");
+        console.log("❌ ========================================");
+        console.log("📧 Email:", email);
+        console.log("🔑 User Input:", otp);
+        console.log("❌ OTP does not match database hash");
+        console.log("❌ ========================================\n");
+
         return res.status(400).json({ success: false, message: "Invalid OTP" });
       }
+
+      console.log("\n✅ ========================================");
+      console.log("✅ OTP VERIFIED SUCCESSFULLY");
+      console.log("✅ ========================================");
+      console.log("📧 Email:", email);
+      console.log("✅ Moving to SMS verification...");
+      console.log("✅ ========================================\n");
 
       const existingUser = await User.findOne({ email });
       if (existingUser) {

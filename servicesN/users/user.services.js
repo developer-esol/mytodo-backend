@@ -21,13 +21,28 @@ class UserService {
    * Generate 6-digit OTP
    */
   generateOTP() {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log("\n🔢 ========================================");
+    console.log("🔢 OTP GENERATION");
+    console.log("🔢 ========================================");
+    console.log("📱 Generated OTP:", otp);
+    console.log("📏 OTP Length:", otp.length);
+    console.log("🔢 ========================================\n");
+    return otp;
   }
 
   /**
    * Send OTP email
    */
   async sendOTPEmail(email, otp) {
+    console.log("\n📧 ========================================");
+    console.log("📧 SENDING OTP EMAIL");
+    console.log("📧 ========================================");
+    console.log("📨 To Email:", email);
+    console.log("🔑 OTP to Send:", otp);
+    console.log("⏰ Timestamp:", new Date().toISOString());
+    console.log("📧 ========================================\n");
+
     logger.info("Sending OTP email", {
       service: "user.services",
       function: "sendOTPEmail",
@@ -44,12 +59,27 @@ class UserService {
         },
       });
 
+      console.log("\n✅ ========================================");
+      console.log("✅ OTP EMAIL SENT SUCCESSFULLY");
+      console.log("✅ ========================================");
+      console.log("📨 Email:", email);
+      console.log("✅ Status: SUCCESS");
+      console.log("✅ ========================================\n");
+
       logger.info("OTP email sent successfully", {
         service: "user.services",
         function: "sendOTPEmail",
         email,
       });
     } catch (error) {
+      console.log("\n❌ ========================================");
+      console.log("❌ OTP EMAIL SEND FAILED");
+      console.log("❌ ========================================");
+      console.log("📨 Email:", email);
+      console.log("❌ Error:", error.message);
+      console.log("📚 Stack:", error.stack);
+      console.log("❌ ========================================\n");
+
       logger.error("Failed to send OTP email", {
         service: "user.services",
         function: "sendOTPEmail",
@@ -179,6 +209,14 @@ class UserService {
       // Handle existing pending user
       if (pendingUser) {
         if (pendingUser.phone === phone) {
+          console.log("\n🔄 ========================================");
+          console.log("🔄 RESENDING OTP - EXISTING PENDING USER");
+          console.log("🔄 ========================================");
+          console.log("📧 Email:", email);
+          console.log("🔒 Old OTP Hash:", pendingUser.otp);
+          console.log("⏰ Old OTP Expires:", pendingUser.otpExpires);
+          console.log("🔄 ========================================\n");
+
           logger.info("Resending OTP to existing pending user", {
             service: "user.services",
             function: "signup",
@@ -189,6 +227,14 @@ class UserService {
           const otp = this.generateOTP();
           const hashedOTP = await bcrypt.hash(otp, 10);
 
+          console.log("\n🆕 ========================================");
+          console.log("🆕 NEW OTP GENERATED FOR RESEND");
+          console.log("🆕 ========================================");
+          console.log("📧 Email:", email);
+          console.log("🔑 New Plain OTP:", otp);
+          console.log("🔒 New Hashed OTP:", hashedOTP);
+          console.log("🆕 ========================================\n");
+
           pendingUser.otp = hashedOTP;
           pendingUser.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
           pendingUser.firstName = firstName;
@@ -198,6 +244,15 @@ class UserService {
           pendingUser.dateOfBirth = dobDate;
 
           await userRepository.updatePendingUser(pendingUser);
+
+          console.log("\n✅ ========================================");
+          console.log("✅ PENDING USER UPDATED WITH NEW OTP");
+          console.log("✅ ========================================");
+          console.log("📧 Email:", email);
+          console.log("🔒 Updated OTP Hash:", pendingUser.otp);
+          console.log("⏰ New Expiry:", pendingUser.otpExpires);
+          console.log("✅ ========================================\n");
+
           await this.sendOTPEmail(email, otp);
 
           logger.info("OTP resent successfully", {
@@ -253,6 +308,17 @@ class UserService {
       const hashedOTP = await bcrypt.hash(otp, 10);
       const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
+      console.log("\n🔐 ========================================");
+      console.log("🔐 OTP HASHING & STORAGE PREPARATION");
+      console.log("🔐 ========================================");
+      console.log("📧 Email:", email);
+      console.log("🔑 Plain OTP:", otp);
+      console.log("🔒 Hashed OTP:", hashedOTP);
+      console.log("📏 Hash Length:", hashedOTP.length);
+      console.log("⏰ OTP Expires At:", otpExpires.toISOString());
+      console.log("⏱️ Valid Duration: 10 minutes");
+      console.log("🔐 ========================================\n");
+
       logger.debug("Creating new pending user", {
         service: "user.services",
         function: "signup",
@@ -271,6 +337,19 @@ class UserService {
         location: locationData,
         dateOfBirth: dobDate,
       });
+
+      console.log("\n💾 ========================================");
+      console.log("💾 OTP SAVED TO DATABASE");
+      console.log("💾 ========================================");
+      console.log("📧 Email:", newPendingUser.email);
+      console.log("🆔 Pending User ID:", newPendingUser._id);
+      console.log("🔒 Stored Hashed OTP:", newPendingUser.otp);
+      console.log("⏰ OTP Expires:", newPendingUser.otpExpires);
+      console.log(
+        "📍 Location:",
+        JSON.stringify(newPendingUser.location, null, 2)
+      );
+      console.log("💾 ========================================\n");
 
       // Send OTP email
       await this.sendOTPEmail(email, otp);
