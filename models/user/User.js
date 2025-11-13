@@ -19,14 +19,18 @@ const userSchema = new mongoose.Schema(
         required: function () {
           return !this.googleId; // Not required for Google OAuth users initially
         },
-        enum: ["AU", "NZ", "LK"],
       },
       countryCode: {
         type: String,
         required: function () {
           return !this.googleId;
         },
-        enum: ["AU", "NZ", "LK"],
+      },
+      suburb: {
+        type: String,
+        required: function () {
+          return !this.googleId;
+        },
       },
       region: {
         type: String,

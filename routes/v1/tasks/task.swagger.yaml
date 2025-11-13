@@ -709,22 +709,28 @@ paths:
             schema:
               type: object
               required:
-                - offerAmount
+                - amount
                 - message
               properties:
-                offerAmount:
+                amount:
                   type: number
+                  minimum: 0.01
                   description: Offer amount
+                  example: 5000
                 currency:
                   type: string
                   default: LKR
+                  enum: [LKR, USD, AUD, NZD, EUR, GBP]
                   description: Currency code
+                  example: LKR
                 message:
                   type: string
                   description: Message to task poster
+                  example: "I can help with this task today"
                 estimatedDuration:
                   type: string
                   description: Estimated time to complete
+                  example: "2-3 hours"
       responses:
         201:
           description: Offer created successfully
@@ -1373,7 +1379,7 @@ components:
           type: string
         taskTakerId:
           type: string
-        offerAmount:
+        amount:
           type: number
         currency:
           type: string

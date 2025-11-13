@@ -51,31 +51,36 @@ paths:
                   type: string
                   format: date
                   description: User's date of birth (must be 18+ years old)
-                  example: 2000-01-15
+                  example: 2001-05-16
                 location:
                   type: object
                   required:
                     - country
+                    - countryCode
+                    - suburb
                     - region
                     - city
                   properties:
                     country:
                       type: string
-                      enum: [AU, NZ, LK]
-                      description: Country code (Australia, New Zealand, or Sri Lanka)
-                      example: AU
+                      description: Full country name
+                      example: Sri Lanka
                     countryCode:
                       type: string
-                      description: Country code (defaults to country if not provided)
-                      example: AU
+                      description: ISO 3166-1 alpha-2 country code (2 characters)
+                      example: LK
+                    suburb:
+                      type: string
+                      description: Suburb or locality
+                      example: Colombo, Sri Lanka
                     region:
                       type: string
-                      description: State or region
-                      example: New South Wales
+                      description: State, province, or region
+                      example: Sri Lanka
                     city:
                       type: string
                       description: City
-                      example: Sydney
+                      example: Colombo
       responses:
         201:
           description: Signup successful, OTP sent to email
@@ -500,13 +505,19 @@ components:
           properties:
             country:
               type: string
-              description: Country code (AU, NZ, LK)
+              description: Full country name
             countryCode:
               type: string
+              description: ISO 3166-1 alpha-2 country code
+            suburb:
+              type: string
+              description: Suburb or locality
             region:
               type: string
+              description: State, province, or region
             city:
               type: string
+              description: City
         age:
           type: integer
           description: Calculated age from date of birth
