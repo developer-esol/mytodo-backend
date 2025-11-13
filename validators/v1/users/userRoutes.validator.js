@@ -40,28 +40,16 @@ const signup = [
     .withMessage("Location is required")
     .isObject()
     .withMessage("Location must be an object"),
-  body("location.country")
-    .trim()
-    .notEmpty()
-    .withMessage("Country is required"),
+  body("location.country").trim().notEmpty().withMessage("Country is required"),
   body("location.countryCode")
     .trim()
     .notEmpty()
     .withMessage("Country code is required")
     .isLength({ min: 2, max: 2 })
     .withMessage("Country code must be 2 characters (e.g., LK, US)"),
-  body("location.suburb")
-    .trim()
-    .notEmpty()
-    .withMessage("Suburb is required"),
-  body("location.region")
-    .trim()
-    .notEmpty()
-    .withMessage("Region is required"),
-  body("location.city")
-    .trim()
-    .notEmpty()
-    .withMessage("City is required"),
+  body("location.suburb").trim().notEmpty().withMessage("Suburb is required"),
+  body("location.region").trim().notEmpty().withMessage("Region is required"),
+  body("location.city").trim().notEmpty().withMessage("City is required"),
   validateRequest,
 ];
 
